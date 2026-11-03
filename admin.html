@@ -40,6 +40,7 @@
         <button class="tab" data-tab="clientes" role="tab">👥 Clientes</button>
         <button class="tab" data-tab="productos" role="tab">🏷️ Productos</button>
         <button class="tab" data-tab="cupones" role="tab">🎟️ Cupones</button>
+        <button class="tab" data-tab="entregas" role="tab">🚚 Entregas</button>
       </nav>
 
       <!-- Resumen -->
@@ -132,6 +133,43 @@
             <tbody id="couponsBody"></tbody>
           </table>
         </div>
+      </section>
+
+      <!-- Entregas -->
+      <section class="panel" id="panel-entregas" hidden>
+        <form class="form" id="deliverySettings">
+          <div class="card">
+            <h3>ENVÍO A DOMICILIO</h3>
+            <p>Zonas que el cliente elige al finalizar la compra. Dejá la lista vacía si solo hacés retiros.</p>
+            <div class="zones" id="zonesList"></div>
+            <button class="btn btn--ghost btn--sm" type="button" id="addZone">+ Agregar zona</button>
+            <div class="form-grid" style="margin-top:18px">
+              <label>Envío gratis desde ($) <small>(vacío = nunca gratis)</small><input name="freeShippingFrom" type="number" min="0" step="1000" /></label>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>RETIRO EN EL LOCAL</h3>
+            <p>Si no cargás la dirección, al cliente le decimos que se la pasan por WhatsApp.</p>
+            <div class="form-grid">
+              <label class="check full"><input type="checkbox" name="pickupEnabled" /> Ofrecer retiro en el local (sin costo)</label>
+              <label class="full">Dirección del local<input name="pickupAddress" maxlength="160" placeholder="Ej: Av. Independencia 1234, Mar del Plata" /></label>
+              <label class="full">Días y horarios<input name="pickupHours" maxlength="160" /></label>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>FRANJAS HORARIAS</h3>
+            <p>Una por línea. El cliente elige su preferida (o ninguna).</p>
+            <textarea name="timeSlots" rows="4" class="mini-textarea"></textarea>
+          </div>
+
+          <p class="form-error" role="alert"></p>
+          <div class="form-actions">
+            <button class="btn btn--primary" type="submit">Guardar configuración</button>
+            <span class="form-ok" role="status"></span>
+          </div>
+        </form>
       </section>
     </div>
   </main>

@@ -23,6 +23,20 @@ function waPhone(phone) {
   return d.length === 10 ? "549" + d : d;
 }
 
+// Entrega, franja y efectivo de un pedido (los pedidos viejos no tienen método de entrega)
+function deliveryLines(o) {
+  const lines = [];
+  if (o.deliveryMethod === "retiro") lines.push("🏪 <b>Retira en el local</b>");
+  else lines.push(o.shipAddress ? `📍 ${esc(o.shipAddress)}` : "📍 Sin dirección cargada");
+  if (o.timeSlot) lines.push(`🕐 ${esc(o.timeSlot)}`);
+  if (o.deliveryMethod) {
+    lines.push(o.cashWith && o.cashWith > o.total
+      ? `💵 Paga con ${money(o.cashWith)} → <b>llevar ${money(o.cashWith - o.total)} de vuelto</b>`
+      : "💵 Paga justo en efectivo");
+  }
+  return lines.map((l) => `<div>${l}</div>`).join("");
+}
+
 let me = null;
 let orderFilter = { status: "", q: "" };
 let ordersCache = [];
@@ -86,12 +100,13 @@ async function loadOrders() {
         </label>
       </div>
       <div class="order__customer">
-        <b>${esc(o.shipName)}</b> · ${esc(o.email)}${o.shipPhone ? ` · ${esc(o.shipPhone)}` : ""}
-        <div>${o.shipAddress ? `📦 ${esc(o.shipAddress)}` : "📦 Sin dirección cargada"}</div>
+        <span><b>${esc(o.shipName)}</b> · ${esc(o.email)}${o.shipPhone ? ` · ${esc(o.shipPhone)}` : ""}</span>
+        ${deliveryLines(o)}
       </div>
       <ul class="order__items">
         ${o.items.map((i) => `<li><span>${i.qty} × ${esc(i.name)}</span><span>${money(i.price * i.qty)}</span></li>`).join("")}
         ${o.discount ? `<li class="order__discount"><span>🎟️ Cupón ${esc(o.couponCode)}</span><span>-${money(o.discount)}</span></li>` : ""}
+        ${o.deliveryMethod === "envio" ? `<li><span>🚚 Envío${o.zone ? ` (${esc(o.zone)})` : ""}</span><span>${o.shipping ? money(o.shipping) : "Gratis"}</span></li>` : ""}
       </ul>
       ${o.notes ? `<div class="order__meta"><span>📝 ${esc(o.notes)}</span></div>` : ""}
       <div class="order__foot">
@@ -122,7 +137,10 @@ async function changeStatus(select) {
 
 function notifyCustomer(id) {
   const o = ordersCache.find((x) => x.id === id);
-  const text = `¡Hola ${o.shipName.split(" ")[0]}! Te escribimos de HZ Suplementos por tu pedido ${code(o.id)}.\n\n${STATUS_MSG[o.status]}`;
+  const pickupReady = o.deliveryMethod === "retiro" && ["confirmado", "enviado"].includes(o.status);
+  const status = pickupReady ? "¡Tu pedido ya está listo para retirar! 🏪" : STATUS_MSG[o.status];
+  const toPay = ["pendiente", "confirmado", "enviado"].includes(o.status) ? `\n\nTotal a pagar en efectivo: ${money(o.total)}` : "";
+  const text = `¡Hola ${o.shipName.split(" ")[0]}! Te escribimos de HZ Suplementos por tu pedido ${code(o.id)}.\n\n${status}${toPay}`;
   window.open(`https://wa.me/${waPhone(o.shipPhone)}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
 }
 
@@ -244,6 +262,54 @@ async function saveCoupon(c, changes = {}) {
   await api("admin", { method: "POST", body: { action: "coupon-save", ...c, ...changes } });
 }
 
+// ===== Entregas =====
+function zoneRow(z = { id: "", name: "", price: "" }) {
+  return `
+    <div class="zone-row" data-zone-id="${esc(z.id)}">
+      <input class="mini-input zone-name" value="${esc(z.name)}" placeholder="Nombre de la zona" maxlength="60" aria-label="Nombre de la zona" />
+      <input class="mini-input zone-price" type="number" min="0" step="100" value="${z.price}" placeholder="Precio" aria-label="Precio de envío" />
+      <button type="button" class="icon-btn" data-remove-zone aria-label="Quitar zona">✕</button>
+    </div>`;
+}
+
+async function loadDelivery() {
+  const { delivery } = await api("admin?view=delivery");
+  const f = $("#deliverySettings");
+  $("#zonesList").innerHTML = delivery.zones.map(zoneRow).join("");
+  f.elements.freeShippingFrom.value = delivery.freeShippingFrom ?? "";
+  f.elements.pickupEnabled.checked = delivery.pickup.enabled;
+  f.elements.pickupAddress.value = delivery.pickup.address;
+  f.elements.pickupHours.value = delivery.pickup.hours;
+  f.elements.timeSlots.value = delivery.timeSlots.join("\n");
+}
+
+async function saveDelivery(e) {
+  e.preventDefault();
+  const f = e.target;
+  const btn = f.querySelector("button[type=submit]");
+  const errorEl = f.querySelector(".form-error");
+  const okEl = f.querySelector(".form-ok");
+  errorEl.textContent = okEl.textContent = "";
+  const delivery = {
+    zones: [...document.querySelectorAll(".zone-row")]
+      .map((row) => ({ id: row.dataset.zoneId, name: row.querySelector(".zone-name").value, price: row.querySelector(".zone-price").value }))
+      .filter((z) => z.name.trim() || z.price !== ""),
+    freeShippingFrom: f.elements.freeShippingFrom.value,
+    pickup: { enabled: f.elements.pickupEnabled.checked, address: f.elements.pickupAddress.value, hours: f.elements.pickupHours.value },
+    timeSlots: f.elements.timeSlots.value.split("\n"),
+  };
+  btn.disabled = true;
+  try {
+    await api("admin", { method: "POST", body: { action: "delivery-save", delivery } });
+    okEl.textContent = "✔ Guardado. La tienda se actualiza en menos de un minuto.";
+    loadDelivery();
+  } catch (err) {
+    errorEl.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // ===== Productos =====
 async function loadProducts() {
   const { products, combos } = await api("admin?view=products");
@@ -284,7 +350,7 @@ async function saveProduct(tr, reset = false) {
 // ===== Eventos =====
 let searchTimer;
 const debounce = (fn) => { clearTimeout(searchTimer); searchTimer = setTimeout(fn, 300); };
-const loaders = { resumen: loadStats, pedidos: loadOrders, clientes: () => loadUsers($("#userSearch").value), productos: loadProducts, cupones: loadCoupons };
+const loaders = { resumen: loadStats, pedidos: loadOrders, clientes: () => loadUsers($("#userSearch").value), productos: loadProducts, cupones: loadCoupons, entregas: loadDelivery };
 let currentTab = "resumen";
 
 function showTab(name) {
@@ -355,6 +421,15 @@ function bindEvents() {
     }
   });
   $("#couponCancel").addEventListener("click", resetCouponForm);
+
+  $("#deliverySettings").addEventListener("submit", saveDelivery);
+  $("#addZone").addEventListener("click", () => {
+    $("#zonesList").insertAdjacentHTML("beforeend", zoneRow());
+    $("#zonesList .zone-row:last-child .zone-name").focus();
+  });
+  $("#zonesList").addEventListener("click", (e) => {
+    if (e.target.closest("[data-remove-zone]")) e.target.closest(".zone-row").remove();
+  });
   document.addEventListener("click", (e) => {
     const notify = e.target.closest("[data-notify]");
     if (notify) notifyCustomer(Number(notify.dataset.notify));

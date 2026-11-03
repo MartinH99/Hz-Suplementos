@@ -3,6 +3,8 @@ import { json, readJson, handle, str, HttpError } from "../lib/http.js";
 import { requireAdmin, createResetToken } from "../lib/auth.js";
 import { getCatalog, ALL_IDS } from "../lib/catalog.js";
 import { normalizeCode, publicCoupon, couponUsageDelta } from "../lib/coupons.js";
+import { orderFields } from "../lib/orders.js";
+import { getDelivery, cleanDelivery } from "../lib/settings.js";
 
 const STATUSES = new Set(["pendiente", "confirmado", "enviado", "entregado", "cancelado"]);
 const num = (v) => Number(v ?? 0);
@@ -61,9 +63,8 @@ export const GET = handle(async (request) => {
       : [];
     return json({
       orders: rows.map((o) => ({
-        id: Number(o.id), status: o.status, total: num(o.total), notes: o.notes, email: o.email,
-        discount: num(o.discount), couponCode: o.coupon_code,
-        shipName: o.ship_name, shipPhone: o.ship_phone, shipAddress: o.ship_address, createdAt: o.created_at,
+        ...orderFields(o),
+        email: o.email,
         items: items.filter((i) => Number(i.order_id) === Number(o.id))
           .map((i) => ({ productId: i.product_id, name: i.name, price: num(i.price), qty: num(i.qty) })),
       })),
@@ -101,6 +102,8 @@ export const GET = handle(async (request) => {
     const withSold = (p) => ({ ...p, sold: soldBy.get(p.id) || 0 });
     return json({ products: products.map(withSold), combos: combos.map(withSold) });
   }
+
+  if (view === "delivery") return json({ delivery: await getDelivery(db) });
 
   if (view === "coupons") {
     const { rows } = await db.execute(`
@@ -191,6 +194,16 @@ export const POST = handle(async (request) => {
         if (!rowsAffected) throw new HttpError(404, "Cupón no encontrado");
       }
       return json({ ok: true });
+    }
+
+    case "delivery-save": {
+      const delivery = cleanDelivery(body.delivery || {});
+      await db.execute({
+        sql: `INSERT INTO settings (key, value, updated_at) VALUES ('delivery', ?, datetime('now'))
+              ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+        args: [JSON.stringify(delivery)],
+      });
+      return json({ delivery });
     }
 
     case "coupon-delete": {

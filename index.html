@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>HZ Suplementos | Rendimiento sin límites</title>
-  <meta name="description" content="Proteínas, aminoácidos, creatina y pre-entrenos de alta calidad. Envíos a todo el país." />
+  <meta name="description" content="Proteínas, aminoácidos, creatina y pre-entrenos de alta calidad. Envíos a domicilio o retiro en el local, con pago en efectivo." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -14,11 +14,11 @@
   <!-- Barra de anuncio -->
   <div class="announce">
     <div class="announce__track">
-      <span>🚚 ENVÍO GRATIS EN COMPRAS +$50.000</span>
-      <span>⚡ 3 CUOTAS SIN INTERÉS</span>
+      <span class="js-free-shipping">🚚 ENVÍO GRATIS EN COMPRAS +$50.000</span>
+      <span>💵 PAGÁS EN EFECTIVO AL RECIBIR</span>
       <span>🔥 10% OFF CON EL CÓDIGO <b>HZ10</b></span>
-      <span>🚚 ENVÍO GRATIS EN COMPRAS +$50.000</span>
-      <span>⚡ 3 CUOTAS SIN INTERÉS</span>
+      <span class="js-free-shipping">🚚 ENVÍO GRATIS EN COMPRAS +$50.000</span>
+      <span>💵 PAGÁS EN EFECTIVO AL RECIBIR</span>
       <span>🔥 10% OFF CON EL CÓDIGO <b>HZ10</b></span>
     </div>
   </div>
@@ -88,8 +88,8 @@
     <section class="trust">
       <div class="container trust__inner">
         <div>✔ Calidad certificada ANMAT</div>
-        <div>✔ Envíos en 24/48 h</div>
-        <div>✔ Pago seguro</div>
+        <div>✔ Envío a domicilio o retiro</div>
+        <div>✔ Pago en efectivo al recibir</div>
         <div>✔ Asesoramiento personalizado</div>
       </div>
     </section>
@@ -211,7 +211,8 @@
         </div>
         <details><summary>¿Cuál es la diferencia entre BCAA y EAA?</summary><p>Los BCAA contienen 3 aminoácidos de cadena ramificada (leucina, isoleucina y valina). Los EAA incluyen los 9 aminoácidos esenciales, por lo que ofrecen un perfil más completo para la síntesis proteica.</p></details>
         <details><summary>¿Cuándo conviene tomar creatina?</summary><p>Lo importante es la constancia: 3 a 5 g diarios, todos los días. Podés tomarla antes o después de entrenar, con agua o junto a tu batido.</p></details>
-        <details><summary>¿Cuánto tarda el envío?</summary><p>En CABA y GBA entregamos en 24/48 h hábiles. Al resto del país, entre 3 y 6 días hábiles.</p></details>
+        <details><summary>¿Cómo pago?</summary><p>En efectivo, cuando recibís tu pedido o cuando lo retirás. Al finalizar la compra podés indicarnos con cuánto vas a pagar y llevamos el cambio justo.</p></details>
+        <details><summary>¿Cómo funcionan los envíos?</summary><p>Hacemos envíos a domicilio por zonas: el costo se calcula al finalizar la compra según tu zona, y elegís la franja horaria que te quede mejor. También podés retirar tu pedido sin costo. Una vez enviado el pedido por WhatsApp, coordinamos la entrega con vos.</p></details>
         <details><summary>¿Necesito suplementos si como bien?</summary><p>Los suplementos complementan una buena alimentación, no la reemplazan. Te ayudan a llegar a tus requerimientos de forma práctica. Ante cualquier duda, consultá con un profesional de la salud.</p></details>
       </div>
     </section>
@@ -248,24 +249,69 @@
   <div class="overlay" id="overlay"></div>
   <aside class="cart" id="cart" aria-label="Carrito">
     <div class="cart__head">
-      <h3>TU CARRITO</h3>
+      <button class="cart__close" id="cartBack" aria-label="Volver al carrito" hidden>←</button>
+      <h3 id="cartTitle">TU CARRITO</h3>
       <button class="cart__close" id="cartClose" aria-label="Cerrar">✕</button>
     </div>
+
+    <!-- Paso 1: productos -->
     <div class="cart__items" id="cartItems"></div>
-    <div class="cart__foot">
-      <form class="coupon" id="couponForm">
-        <input id="couponInput" type="text" maxlength="30" placeholder="Código de descuento" aria-label="Código de descuento" autocomplete="off" />
-        <button class="btn btn--ghost btn--sm" type="submit">Aplicar</button>
-      </form>
-      <div class="coupon-applied" id="couponApplied" hidden>
-        <span>🎟️ <b id="couponCode"></b> <small id="couponDesc"></small></span>
-        <button type="button" class="link" id="couponRemove">Quitar</button>
+
+    <!-- Paso 2: entrega y pago en efectivo -->
+    <form class="cart__checkout form" id="deliveryForm" novalidate hidden>
+      <fieldset class="guest-only">
+        <legend>Tus datos</legend>
+        <label>Nombre y apellido<input name="name" autocomplete="name" maxlength="80" /></label>
+      </fieldset>
+      <label>WhatsApp / teléfono<input name="phone" type="tel" autocomplete="tel" maxlength="40" placeholder="Para coordinar la entrega" /></label>
+
+      <fieldset>
+        <legend>¿Cómo lo recibís?</legend>
+        <div class="options" id="methodOptions">
+          <label class="option"><input type="radio" name="method" value="envio" checked /><span>🚚 <b>Envío a domicilio</b><small id="shippingFromText"></small></span></label>
+          <label class="option" id="pickupOption"><input type="radio" name="method" value="retiro" /><span>🏪 <b>Retiro en el local</b><small>Sin costo</small></span></label>
+        </div>
+      </fieldset>
+
+      <div id="shippingFields">
+        <label>Zona<select name="zoneId" id="zoneSelect"></select></label>
+        <label>Dirección de entrega<input name="address" autocomplete="street-address" maxlength="160" placeholder="Calle, número, piso/depto" /></label>
       </div>
-      <textarea id="orderNotes" class="cart__notes" rows="2" maxlength="500" placeholder="Notas del pedido (sabor, horario de entrega...)" aria-label="Notas del pedido"></textarea>
+      <div class="info-box" id="pickupInfo" hidden></div>
+
+      <label id="slotField">Franja horaria preferida<select name="timeSlot" id="slotSelect"></select></label>
+
+      <fieldset>
+        <legend>Pago</legend>
+        <div class="info-box">💵 <b>Efectivo</b> al recibir o al retirar.</div>
+        <label>¿Con cuánto vas a pagar? <small>(así llevamos el cambio)</small>
+          <input name="cashWith" type="number" min="0" step="100" inputmode="numeric" placeholder="Pago justo" />
+        </label>
+        <p class="change-hint" id="changeHint"></p>
+      </fieldset>
+
+      <label>Notas del pedido <small>(opcional)</small>
+        <textarea id="orderNotes" name="notes" rows="2" maxlength="500" placeholder="Sabor, timbre, referencias..."></textarea>
+      </label>
+    </form>
+
+    <div class="cart__foot">
+      <div id="cartStep1">
+        <form class="coupon" id="couponForm">
+          <input id="couponInput" type="text" maxlength="30" placeholder="Código de descuento" aria-label="Código de descuento" autocomplete="off" />
+          <button class="btn btn--ghost btn--sm" type="submit">Aplicar</button>
+        </form>
+        <div class="coupon-applied" id="couponApplied" hidden>
+          <span>🎟️ <b id="couponCode"></b> <small id="couponDesc"></small></span>
+          <button type="button" class="link" id="couponRemove">Quitar</button>
+        </div>
+        <p class="free-progress" id="freeProgress" hidden></p>
+      </div>
       <div class="cart__line" id="subtotalLine" hidden><span>Subtotal</span><span id="cartSubtotal">$0</span></div>
       <div class="cart__line cart__line--discount" id="discountLine" hidden><span>Descuento</span><span id="cartDiscount">-$0</span></div>
+      <div class="cart__line" id="shippingLine" hidden><span>Envío</span><span id="cartShipping">$0</span></div>
       <div class="cart__total"><span>Total</span><strong id="cartTotal">$0</strong></div>
-      <button class="btn btn--primary btn--block" id="checkout">Finalizar compra por WhatsApp</button>
+      <button class="btn btn--primary btn--block" id="checkout">Continuar</button>
       <p class="cart__hint" id="cartHint"></p>
     </div>
   </aside>

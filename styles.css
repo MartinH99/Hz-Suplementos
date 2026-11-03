@@ -414,6 +414,34 @@ h2 { font-size: clamp(2.4rem, 6vw, 4rem); }
 .coupon-code { font-family: ui-monospace, monospace; letter-spacing: .05em; color: var(--accent); }
 @media (max-width: 860px) { .form-grid--3 { grid-template-columns: 1fr; } }
 
+/* ===== Checkout: entrega y pago ===== */
+.cart__checkout { flex: 1; overflow-y: auto; padding: 18px 24px; gap: 16px; align-content: start; }
+.cart__checkout fieldset { border: none; display: grid; gap: 10px; }
+.cart__checkout legend { font-family: var(--display); font-size: 1.15rem; letter-spacing: .04em; margin-bottom: 8px; }
+.cart__head #cartBack { margin-right: 10px; }
+.cart__head h3 { flex: 1; }
+.options { display: grid; gap: 8px; }
+.option { position: relative; display: block !important; cursor: pointer; }
+.option input { position: absolute; opacity: 0; }
+.option span { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; color: var(--text); font-weight: 500; transition: border-color .2s, background .2s; }
+.option span b { font-weight: 700; }
+.option span small { grid-column: 2; color: var(--muted); font-weight: 500; }
+.option input:checked + span { border-color: var(--accent); background: rgba(198,255,0,.07); }
+.option input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+#shippingFields { display: grid; gap: 14px; }
+.info-box { padding: 12px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); font-size: .88rem; line-height: 1.6; }
+.change-hint { font-size: .85rem; font-weight: 700; color: var(--accent); min-height: 1.2em; }
+.change-hint--error { color: #ff6b4a; }
+.free-progress { font-size: .82rem; color: var(--muted); text-align: center; margin-bottom: 12px; padding: 8px; border-radius: 10px; background: var(--card); }
+.free-progress b { color: var(--accent); }
+
+/* Panel admin: entregas */
+.zones { display: grid; gap: 10px; margin-bottom: 14px; }
+.zone-row { display: grid; grid-template-columns: 1fr 140px auto; gap: 10px; align-items: center; }
+.zone-row .mini-input { width: 100%; }
+.mini-textarea { width: 100%; padding: 12px 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; color: var(--text); font: inherit; resize: vertical; outline: none; }
+.mini-textarea:focus { border-color: var(--accent); }
+
 /* Página restablecer contraseña */
 .reset { display: grid; place-items: center; }
 .reset__box { transform: none; width: min(460px, 100%); }
@@ -449,7 +477,8 @@ h2 { font-size: clamp(2.4rem, 6vw, 4rem); }
 
 .order__customer { font-size: .9rem; margin-bottom: 4px; display: grid; gap: 4px; }
 .order__customer div { color: var(--muted); font-size: .85rem; }
-.status-select { position: relative; display: inline-block; border-radius: 999px; background: #3f3f46; }
+/* El color de fondo lo da la clase status--estado */
+.status-select { position: relative; display: inline-block; border-radius: 999px; }
 .status-select select { appearance: none; background: transparent; border: none; color: inherit; font: inherit; font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; padding: 7px 30px 7px 14px; cursor: pointer; outline: none; }
 .status-select::after { content: "▾"; position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: .7rem; pointer-events: none; }
 .status-select option { background: var(--bg-2); color: var(--text); }

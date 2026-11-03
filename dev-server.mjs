@@ -35,7 +35,7 @@ http.createServer(async (req, res) => {
     if (!path || path.endsWith("/") || path.endsWith("\\")) path += "index.html";
     if (!extname(path)) path += ".html";
     const file = await readFile(join(ROOT, path));
-    res.writeHead(200, { "content-type": TYPES[extname(path)] || "application/octet-stream" });
+    res.writeHead(200, { "content-type": TYPES[extname(path)] || "application/octet-stream", "cache-control": "no-cache" });
     res.end(file);
   } catch (err) {
     if (err.code !== "ENOENT" && err.code !== "ERR_MODULE_NOT_FOUND") console.error(err);

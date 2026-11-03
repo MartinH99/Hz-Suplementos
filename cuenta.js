@@ -40,9 +40,12 @@ function renderOrders() {
       <ul class="order__items">
         ${o.items.map((i) => `<li><span>${i.qty} × ${esc(i.name)}</span><span>${money(i.price * i.qty)}</span></li>`).join("")}
         ${o.discount ? `<li class="order__discount"><span>🎟️ Cupón ${esc(o.couponCode)}</span><span>-${money(o.discount)}</span></li>` : ""}
+        ${o.deliveryMethod === "envio" ? `<li><span>🚚 Envío${o.zone ? ` (${esc(o.zone)})` : ""}</span><span>${o.shipping ? money(o.shipping) : "Gratis"}</span></li>` : ""}
       </ul>
       <div class="order__meta">
-        ${o.shipAddress ? `<span>📦 ${esc(o.shipAddress)}</span>` : ""}
+        ${o.deliveryMethod === "retiro" ? "<span>🏪 Retiro en el local</span>" : o.shipAddress ? `<span>📍 ${esc(o.shipAddress)}</span>` : ""}
+        ${o.timeSlot ? `<span>🕐 ${esc(o.timeSlot)}</span>` : ""}
+        ${o.deliveryMethod ? `<span>💵 Efectivo${o.cashWith && o.cashWith > o.total ? ` · pagás con ${money(o.cashWith)} (vuelto ${money(o.cashWith - o.total)})` : ""}</span>` : ""}
         ${o.notes ? `<span>📝 ${esc(o.notes)}</span>` : ""}
       </div>
       <div class="order__foot">

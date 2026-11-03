@@ -25,6 +25,19 @@ async function loadCatalog() {
   const data = await api("catalog").catch(() => fetch("/data/catalog.json").then((r) => r.json()));
   PRODUCTS = data.products;
   COMBOS = Object.fromEntries(data.combos.map((c) => [c.id, c]));
+  DELIVERY = data.delivery || DELIVERY;
+}
+
+// Opciones de entrega (editables en el panel admin → Entregas)
+let DELIVERY = { pickup: { enabled: false, address: "", hours: "" }, zones: [], freeShippingFrom: null, timeSlots: [] };
+
+// Textos de la landing que dependen de la configuración de entregas
+function renderDeliveryTexts() {
+  const free = DELIVERY.freeShippingFrom;
+  document.querySelectorAll(".js-free-shipping").forEach((el) => {
+    el.hidden = free == null;
+    if (free != null) el.innerHTML = free === 0 ? "🚚 ENVÍO GRATIS" : `🚚 ENVÍO GRATIS EN COMPRAS +${money(free)}`;
+  });
 }
 
 // Actualiza precios de los combos (escritos en el HTML) y oculta los pausados
@@ -201,15 +214,71 @@ async function toggleFavorite(btn) {
   }
 }
 
-function renderCart() {
-  if (!$("#cartItems")) return;
+// ===== Carrito en 2 pasos: 1) productos y cupón · 2) entrega y pago en efectivo =====
+let checkoutStep = 1;
+const isFreeShipping = (subtotal) => DELIVERY.freeShippingFrom != null && subtotal >= DELIVERY.freeShippingFrom;
+
+function deliveryChoice() {
+  const f = $("#deliveryForm");
+  if (!f) return {};
+  const v = (n) => (f.elements[n]?.value || "").trim();
+  return {
+    method: f.elements.method.value || "envio",
+    zoneId: v("zoneId"),
+    address: v("address"),
+    timeSlot: v("timeSlot"),
+    cashWith: v("cashWith"),
+    phone: v("phone"),
+    name: v("name"),
+    notes: v("notes"),
+  };
+}
+
+// Totales que ve el cliente (el servidor los vuelve a calcular al guardar el pedido)
+function computeTotals() {
   const ids = Object.keys(cart).filter((id) => findItem(id));
   const count = ids.reduce((s, id) => s + cart[id], 0);
   const subtotal = ids.reduce((s, id) => s + findItem(id).price * cart[id], 0);
   const discount = couponDiscount(subtotal);
+  let shipping = null; // null = todavía no eligió zona
+  if (checkoutStep === 2) {
+    const d = deliveryChoice();
+    const zone = DELIVERY.zones.find((z) => z.id === d.zoneId);
+    if (d.method === "retiro") shipping = 0;
+    else if (zone) shipping = isFreeShipping(subtotal) ? 0 : zone.price;
+  }
+  return { ids, count, subtotal, discount, shipping, total: subtotal - discount + (shipping || 0) };
+}
+
+function renderCart() {
+  if (!$("#cartItems")) return;
+  const { ids, count, subtotal, discount, shipping, total } = computeTotals();
   $("#cartCount").textContent = count;
-  $("#cartTotal").textContent = money(subtotal - discount);
+  $("#cartTotal").textContent = money(total);
   renderCoupon(subtotal, discount);
+  $("#subtotalLine").hidden = !(discount || checkoutStep === 2);
+  $("#cartSubtotal").textContent = money(subtotal);
+  $("#shippingLine").hidden = checkoutStep !== 2;
+  $("#cartShipping").textContent = shipping == null ? "Elegí tu zona" : shipping === 0 ? "Gratis" : money(shipping);
+
+  // Progreso hacia el envío gratis
+  const free = DELIVERY.freeShippingFrom;
+  const progress = $("#freeProgress");
+  progress.hidden = free == null || !subtotal || free === 0;
+  if (!progress.hidden) {
+    progress.innerHTML = subtotal >= free
+      ? "🎉 ¡Tu compra tiene <b>envío gratis</b>!"
+      : `🚚 Te faltan <b>${money(free - subtotal)}</b> para el envío gratis`;
+  }
+
+  // Vuelto del pago en efectivo
+  const cash = Number(deliveryChoice().cashWith);
+  const hint = $("#changeHint");
+  if (hint) {
+    hint.className = "change-hint" + (cash && cash < total ? " change-hint--error" : "");
+    hint.textContent = !cash ? "" : cash < total ? `Tiene que ser al menos ${money(total)}` : cash === total ? "Pago justo 👌" : `Tu vuelto: ${money(cash - total)}`;
+  }
+
   $("#cartItems").innerHTML = ids.length
     ? ids.map((id) => {
         const item = findItem(id);
@@ -242,9 +311,61 @@ function addToCart(id) {
 }
 
 const toggleCart = (open) => {
+  if (open && checkoutStep !== 1) setStep(1);
   $("#cart")?.classList.toggle("open", open);
   $("#overlay")?.classList.toggle("open", open);
 };
+
+function setStep(step) {
+  checkoutStep = step;
+  $("#cartItems").hidden = step !== 1;
+  $("#deliveryForm").hidden = step !== 2;
+  $("#cartStep1").hidden = step !== 1;
+  $("#cartBack").hidden = step !== 2;
+  $("#cartTitle").textContent = step === 1 ? "TU CARRITO" : "ENTREGA Y PAGO";
+  $("#checkout").textContent = step === 1 ? "Continuar" : "Confirmar pedido por WhatsApp";
+  if (step === 2) prepareDeliveryForm();
+  renderCart();
+}
+
+// Completa el formulario de entrega con la configuración y los datos del perfil
+function prepareDeliveryForm() {
+  const f = $("#deliveryForm");
+  const { subtotal } = computeTotals();
+  const free = isFreeShipping(subtotal);
+  const selectedZone = f.elements.zoneId.value;
+  $("#zoneSelect").innerHTML = `<option value="">Elegí tu zona</option>` +
+    DELIVERY.zones.map((z) => `<option value="${esc(z.id)}">${esc(z.name)} — ${free ? "Gratis" : money(z.price)}</option>`).join("");
+  f.elements.zoneId.value = selectedZone;
+  const prices = DELIVERY.zones.map((z) => z.price);
+  $("#shippingFromText").textContent = !prices.length ? "A coordinar" : free ? "¡Gratis en tu compra!" : `Desde ${money(Math.min(...prices))}`;
+
+  const selectedSlot = f.elements.timeSlot.value;
+  $("#slotSelect").innerHTML = `<option value="">Sin preferencia</option>` +
+    DELIVERY.timeSlots.map((s) => `<option>${esc(s)}</option>`).join("");
+  f.elements.timeSlot.value = selectedSlot;
+  $("#slotField").hidden = !DELIVERY.timeSlots.length;
+
+  $("#pickupOption").hidden = !DELIVERY.pickup.enabled;
+  if (!DELIVERY.pickup.enabled) f.elements.method.value = "envio";
+  if (!DELIVERY.zones.length && DELIVERY.pickup.enabled) f.elements.method.value = "retiro";
+  $("#methodOptions").querySelector('input[value="envio"]').closest(".option").hidden = !DELIVERY.zones.length;
+  $("#pickupInfo").innerHTML = `📍 ${DELIVERY.pickup.address ? esc(DELIVERY.pickup.address) : "Te pasamos la dirección exacta por WhatsApp"}` +
+    (DELIVERY.pickup.hours ? `<br />🕐 ${esc(DELIVERY.pickup.hours)}` : "");
+
+  f.querySelector(".guest-only").hidden = !!currentUser;
+  if (currentUser) {
+    if (!f.elements.phone.value) f.elements.phone.value = currentUser.phone || "";
+    if (!f.elements.address.value) f.elements.address.value = [currentUser.address, currentUser.city].filter(Boolean).join(", ");
+  }
+  updateMethodUI();
+}
+
+function updateMethodUI() {
+  const retiro = $("#deliveryForm").elements.method.value === "retiro";
+  $("#shippingFields").hidden = retiro;
+  $("#pickupInfo").hidden = !retiro;
+}
 
 // ===== Cupones (requieren cuenta; el servidor recalcula el descuento al crear el pedido) =====
 let appliedCoupon = null;
@@ -266,9 +387,7 @@ function renderCoupon(subtotal, discount) {
   const active = !!(appliedCoupon && currentUser);
   $("#couponForm").hidden = active;
   $("#couponApplied").hidden = !active;
-  $("#subtotalLine").hidden = !discount;
   $("#discountLine").hidden = !discount;
-  $("#cartSubtotal").textContent = money(subtotal);
   $("#cartDiscount").textContent = "-" + money(discount);
   if (active) {
     const c = appliedCoupon;
@@ -302,56 +421,90 @@ async function applyCoupon() {
   }
 }
 
-// Finalizar compra: si hay sesión, guarda el pedido en la base y lo envía por WhatsApp
-function buildOrderMessage({ lines, total, order, notes }) {
+// Mensaje de WhatsApp con el pedido completo (s = resumen ya calculado)
+function buildOrderMessage(s) {
   const msg = [
-    order ? `¡Hola HZ Suplementos! 👋 Quiero confirmar mi pedido *#HZ-${String(order.id).padStart(5, "0")}*:` : "¡Hola HZ Suplementos! 👋 Quiero hacer este pedido:",
+    s.orderId ? `¡Hola HZ Suplementos! 👋 Quiero confirmar mi pedido *#HZ-${String(s.orderId).padStart(5, "0")}*:` : "¡Hola HZ Suplementos! 👋 Quiero hacer este pedido:",
     "",
-    ...lines.map((l) => `• ${l.qty} x ${l.name} — ${money(l.price * l.qty)}`),
+    ...s.lines.map((l) => `• ${l.qty} x ${l.name} — ${money(l.price * l.qty)}`),
     "",
+    `Subtotal: ${money(s.subtotal)}`,
   ];
-  if (order?.discount) msg.push(`Subtotal: ${money(order.subtotal)}`, `🎟️ Cupón ${order.couponCode}: -${money(order.discount)}`);
-  msg.push(`*Total: ${money(total)}*`);
-  if (order) {
-    msg.push("", `👤 ${order.shipName}`);
-    if (order.shipPhone) msg.push(`📞 ${order.shipPhone}`);
-    msg.push(`📦 ${order.shipAddress || "Dirección a coordinar"}`);
-  }
-  if (notes) msg.push("", `📝 ${notes}`);
-  msg.push("", "¿Me confirman disponibilidad y forma de pago? ¡Gracias!");
+  if (s.discount) msg.push(`🎟️ Cupón ${s.couponCode}: -${money(s.discount)}`);
+  msg.push(s.method === "retiro" ? "🏪 Retiro en el local" : `🚚 Envío${s.zone ? ` (${s.zone})` : ""}: ${s.shipping ? money(s.shipping) : "Gratis"}`);
+  msg.push(`*Total: ${money(s.total)}*`, "");
+  if (s.name) msg.push(`👤 ${s.name}`);
+  if (s.phone) msg.push(`📞 ${s.phone}`);
+  if (s.method !== "retiro") msg.push(`📍 ${s.address}`);
+  if (s.timeSlot) msg.push(`🕐 ${s.timeSlot}`);
+  msg.push(s.cashWith && s.cashWith > s.total
+    ? `💵 Pago en efectivo con ${money(s.cashWith)} (vuelto: ${money(s.cashWith - s.total)})`
+    : "💵 Pago en efectivo (justo)");
+  if (s.notes) msg.push(`📝 ${s.notes}`);
+  msg.push("", "¿Me confirman el pedido? ¡Gracias!");
   return msg.join("\n");
 }
 
-async function checkout() {
-  const ids = Object.keys(cart).filter((id) => findItem(id));
-  if (!ids.length) return toast("Agregá productos para continuar");
-  const notes = ($("#orderNotes")?.value || "").trim();
+// Valida el paso 2 en el navegador para dar errores claros (el servidor valida de nuevo)
+function deliveryError(d, total) {
+  const f = $("#deliveryForm");
+  if (!currentUser && !d.name) return [f.elements.name, "Ingresá tu nombre"];
+  if (d.method === "envio") {
+    if (DELIVERY.zones.length && !d.zoneId) return [f.elements.zoneId, "Elegí tu zona de envío"];
+    if (d.address.length < 5) return [f.elements.address, "Ingresá la dirección de entrega"];
+  }
+  if (d.cashWith && Number(d.cashWith) < total) return [f.elements.cashWith, `El monto con el que pagás tiene que ser de al menos ${money(total)}`];
+  return null;
+}
+
+async function onCheckoutClick() {
+  const totals = computeTotals();
+  if (!totals.ids.length) return toast("Agregá productos para continuar");
+  if (checkoutStep === 1) return setStep(2);
+
+  const d = deliveryChoice();
+  const error = deliveryError(d, totals.total);
+  if (error) {
+    error[0].focus();
+    return toast(error[1]);
+  }
   const btn = $("#checkout");
+  const zone = DELIVERY.zones.find((z) => z.id === d.zoneId);
+  let summary = {
+    lines: totals.ids.map((id) => ({ name: findItem(id).name, price: findItem(id).price, qty: cart[id] })),
+    subtotal: totals.subtotal, discount: totals.discount, couponCode: appliedCoupon?.code,
+    shipping: totals.shipping || 0, total: totals.total, method: d.method, zone: zone?.name || "",
+    name: currentUser?.name || d.name, phone: d.phone, address: d.address, timeSlot: d.timeSlot,
+    cashWith: Number(d.cashWith) || null, notes: d.notes,
+  };
 
   // Abrimos la pestaña ya (dentro del clic) para que el navegador no la bloquee
   const win = window.open("", "_blank");
-  let order = null;
-  let lines = ids.map((id) => ({ name: findItem(id).name, price: findItem(id).price, qty: cart[id] }));
-  let total = lines.reduce((s, l) => s + l.price * l.qty, 0);
-
   if (currentUser) {
     btn.disabled = true;
     try {
-      ({ order } = await api("orders", {
+      const { order } = await api("orders", {
         method: "POST",
-        body: { items: ids.map((id) => ({ id, qty: cart[id] })), notes, coupon: appliedCoupon?.code },
-      }));
-      lines = order.items;
-      total = order.total;
+        body: {
+          items: totals.ids.map((id) => ({ id, qty: cart[id] })),
+          notes: d.notes,
+          coupon: appliedCoupon?.code,
+          delivery: { method: d.method, zoneId: d.zoneId, address: d.address, timeSlot: d.timeSlot, cashWith: d.cashWith, phone: d.phone },
+        },
+      });
+      summary = {
+        ...summary, orderId: order.id, lines: order.items, subtotal: order.subtotal, discount: order.discount,
+        couponCode: order.couponCode, shipping: order.shipping, total: order.total, zone: order.zone, cashWith: order.cashWith,
+      };
     } catch (err) {
       win?.close();
-      btn.disabled = false;
       return toast(err.message);
+    } finally {
+      btn.disabled = false;
     }
-    btn.disabled = false;
   }
 
-  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(buildOrderMessage({ lines, total, order, notes }))}`;
+  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(buildOrderMessage(summary))}`;
   if (win) {
     win.opener = null;
     win.location.href = url;
@@ -359,13 +512,15 @@ async function checkout() {
     location.href = url;
   }
 
-  if (order) {
+  if (summary.orderId) {
     cart = {};
     saveCart();
+    const f = $("#deliveryForm");
+    f.elements.notes.value = "";
+    f.elements.cashWith.value = "";
     setCoupon(null);
-    if ($("#orderNotes")) $("#orderNotes").value = "";
     toggleCart(false);
-    toast(`📲 Pedido #HZ-${String(order.id).padStart(5, "0")} guardado. ¡Terminá de enviarlo por WhatsApp!`);
+    toast(`📲 Pedido #HZ-${String(summary.orderId).padStart(5, "0")} guardado. ¡Terminá de enviarlo por WhatsApp!`);
   } else {
     toast("📲 Abriendo WhatsApp con tu pedido...");
   }
@@ -416,7 +571,13 @@ function initLanding() {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { toggleCart(false); closeAuth(); }
   });
-  $("#checkout").addEventListener("click", checkout);
+  $("#checkout").addEventListener("click", onCheckoutClick);
+  $("#cartBack").addEventListener("click", () => setStep(1));
+  $("#deliveryForm").addEventListener("input", (e) => {
+    if (e.target.name === "method") updateMethodUI();
+    renderCart();
+  });
+  $("#deliveryForm").addEventListener("submit", (e) => { e.preventDefault(); onCheckoutClick(); });
   $("#couponForm").addEventListener("submit", (e) => { e.preventDefault(); applyCoupon(); });
   $("#couponRemove").addEventListener("click", () => setCoupon(null));
 
@@ -484,6 +645,7 @@ if (grid) {
   Promise.all([loadCatalog(), loadSession()]).then(() => {
     renderProducts();
     renderCombos();
+    renderDeliveryTexts();
     renderCart();
     if (location.hash === "#carrito") toggleCart(true);
     if (location.hash === "#ingresar") openAuth("login");

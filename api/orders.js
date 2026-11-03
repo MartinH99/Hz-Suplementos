@@ -3,10 +3,8 @@ import { json, readJson, handle, str, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
 import { buildLines } from "../lib/catalog.js";
 import { validateCoupon, couponUsageDelta } from "../lib/coupons.js";
-
-function shippingAddress(u) {
-  return [u.address, u.city, u.province, u.zip && `CP ${u.zip}`].filter(Boolean).join(", ");
-}
+import { getDelivery, quoteDelivery } from "../lib/settings.js";
+import { orderFields } from "../lib/orders.js";
 
 // GET /api/orders → historial de pedidos con sus productos
 export const GET = handle(async (request) => {
@@ -28,23 +26,12 @@ export const GET = handle(async (request) => {
     byOrder.set(Number(i.order_id), list);
   }
   return json({
-    orders: orders.rows.map((o) => ({
-      id: Number(o.id),
-      status: o.status,
-      total: Number(o.total),
-      discount: Number(o.discount),
-      couponCode: o.coupon_code,
-      notes: o.notes,
-      shipName: o.ship_name,
-      shipPhone: o.ship_phone,
-      shipAddress: o.ship_address,
-      createdAt: o.created_at,
-      items: byOrder.get(Number(o.id)) || [],
-    })),
+    orders: orders.rows.map((o) => ({ ...orderFields(o), items: byOrder.get(Number(o.id)) || [] })),
   });
 });
 
-// POST /api/orders { items: [{ id, qty }], notes, coupon } → registra el pedido con precios del servidor
+// POST /api/orders { items: [{ id, qty }], notes, coupon, delivery: { method, zoneId, address, timeSlot, cashWith } }
+// → registra el pedido con precios, descuento y envío calculados en el servidor
 export const POST = handle(async (request) => {
   const user = await requireUser(request);
   const body = await readJson(request);
@@ -54,14 +41,27 @@ export const POST = handle(async (request) => {
   let coupon = null;
   let discount = 0;
   if (body.coupon) ({ coupon, discount } = await validateCoupon(db, user.id, body.coupon, subtotal));
-  const total = subtotal - discount;
+  const delivery = quoteDelivery(await getDelivery(db), body.delivery, subtotal);
+  const total = subtotal - discount + delivery.shipping;
+
+  // Pago en efectivo: con cuánto paga (vacío = pago justo)
+  const rawCash = body.delivery?.cashWith;
+  const cashWith = rawCash === "" || rawCash == null ? null : Math.round(Number(rawCash));
+  if (cashWith !== null && !(cashWith >= total)) throw new HttpError(400, `El monto con el que pagás tiene que ser de al menos $${total.toLocaleString("es-AR")}`);
+
+  const shipAddress = delivery.method === "retiro" ? "Retiro en el local" : delivery.address;
+  const shipPhone = str(body.delivery?.phone, 40) || user.phone;
 
   // Un solo batch = una transacción atómica: pedido, ítems y uso del cupón se guardan juntos o nada.
   const [created] = await db.batch([
     {
-      sql: `INSERT INTO orders (user_id, total, discount, coupon_code, notes, ship_name, ship_phone, ship_address)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, status, created_at`,
-      args: [user.id, total, discount, coupon?.code || "", str(body.notes, 500), user.name, user.phone, shippingAddress(user)],
+      sql: `INSERT INTO orders (user_id, total, discount, coupon_code, notes, ship_name, ship_phone, ship_address,
+              delivery_method, zone, shipping, time_slot, cash_with)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+      args: [
+        user.id, total, discount, coupon?.code || "", str(body.notes, 500), user.name, shipPhone, shipAddress,
+        delivery.method, delivery.zone, delivery.shipping, delivery.timeSlot, cashWith,
+      ],
     },
     ...lines.map((l) => ({
       sql: `INSERT INTO order_items (order_id, product_id, name, price, qty)
@@ -69,13 +69,17 @@ export const POST = handle(async (request) => {
       args: [user.id, l.id, l.name, l.price, l.qty],
     })),
     ...(coupon ? [couponUsageDelta(coupon.code, 1)] : []),
+    // Si el cliente no tenía dirección o teléfono en su perfil, guardamos los que usó
+    ...(delivery.method === "envio" && !user.address
+      ? [{ sql: "UPDATE users SET address = ? WHERE id = ? AND address = ''", args: [delivery.address, user.id] }]
+      : []),
+    ...(shipPhone && !user.phone ? [{ sql: "UPDATE users SET phone = ? WHERE id = ? AND phone = ''", args: [shipPhone, user.id] }] : []),
   ], "write");
 
-  const row = created.rows[0];
   return json({
     order: {
-      id: Number(row.id), status: row.status, total, subtotal, discount, couponCode: coupon?.code || "",
-      createdAt: row.created_at, shipName: user.name, shipPhone: user.phone, shipAddress: shippingAddress(user),
+      ...orderFields(created.rows[0]),
+      subtotal,
       items: lines.map((l) => ({ productId: l.id, name: l.name, price: l.price, qty: l.qty })),
     },
   }, 201);
