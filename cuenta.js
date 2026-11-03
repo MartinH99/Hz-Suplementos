@@ -15,6 +15,7 @@ function updateCartCount() {
 function renderHeader(stats) {
   $("#helloName").textContent = user.name.split(" ")[0].toUpperCase();
   $("#helloEmail").textContent = user.email;
+  $("#adminLink").hidden = user.role !== "admin";
   $("#statOrders").textContent = stats.orders;
   $("#statSpent").textContent = money(stats.spent);
   $("#statFavs").textContent = favIds.length;

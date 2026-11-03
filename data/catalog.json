@@ -160,18 +160,21 @@
       "id": "combo-volumen",
       "name": "Combo Volumen",
       "price": 54900,
+      "old": 68500,
       "icon": "📦"
     },
     {
       "id": "combo-rendimiento",
       "name": "Combo Rendimiento",
       "price": 62900,
+      "old": 79200,
       "icon": "📦"
     },
     {
       "id": "combo-definicion",
       "name": "Combo Definición",
       "price": 66500,
+      "old": 84000,
       "icon": "📦"
     }
   ]

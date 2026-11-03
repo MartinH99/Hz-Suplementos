@@ -1,7 +1,7 @@
 import { getDb } from "../lib/db.js";
 import { json, readJson, handle, str, HttpError } from "../lib/http.js";
 import { requireUser } from "../lib/auth.js";
-import { ITEMS } from "../lib/catalog.js";
+import { getPurchasable } from "../lib/catalog.js";
 
 function shippingAddress(u) {
   return [u.address, u.city, u.province, u.zip && `CP ${u.zip}`].filter(Boolean).join(", ");
@@ -47,11 +47,13 @@ export const POST = handle(async (request) => {
   const body = await readJson(request);
   if (!Array.isArray(body.items) || !body.items.length) throw new HttpError(400, "El carrito está vacío");
 
+  const items = await getPurchasable();
   const lines = [];
   for (const { id, qty } of body.items.slice(0, 50)) {
-    const product = ITEMS.get(id);
+    const product = items.get(id);
     const n = Math.floor(Number(qty));
-    if (!product || !(n >= 1 && n <= 99)) throw new HttpError(400, "Hay un producto inválido en el carrito");
+    if (!product) throw new HttpError(400, "Uno de los productos del carrito ya no está disponible");
+    if (!(n >= 1 && n <= 99)) throw new HttpError(400, "Hay una cantidad inválida en el carrito");
     lines.push({ id, name: product.name, price: product.price, qty: n });
   }
   const total = lines.reduce((s, l) => s + l.price * l.qty, 0);

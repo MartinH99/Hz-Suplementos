@@ -20,9 +20,21 @@ async function api(path, { method = "GET", body } = {}) {
 let PRODUCTS = [];
 let COMBOS = {};
 async function loadCatalog() {
-  const data = await fetch("/data/catalog.json").then((r) => r.json());
+  // Precios y productos activos vienen de la base (editables en el panel admin);
+  // si la API no responde, usamos el catálogo base del repo.
+  const data = await api("catalog").catch(() => fetch("/data/catalog.json").then((r) => r.json()));
   PRODUCTS = data.products;
   COMBOS = Object.fromEntries(data.combos.map((c) => [c.id, c]));
+}
+
+// Actualiza precios de los combos (escritos en el HTML) y oculta los pausados
+function renderCombos() {
+  document.querySelectorAll(".combo").forEach((card) => {
+    const combo = COMBOS[card.querySelector(".add")?.dataset.id];
+    card.hidden = !combo;
+    if (!combo) return;
+    card.querySelector(".combo__price").innerHTML = `${combo.old ? `<s>${money(combo.old)}</s>` : ""}<strong>${money(combo.price)}</strong>`;
+  });
 }
 const findItem = (id) => PRODUCTS.find((p) => p.id === id) || COMBOS[id];
 
@@ -394,6 +406,7 @@ if (grid) {
   initLanding();
   Promise.all([loadCatalog(), loadSession()]).then(() => {
     renderProducts();
+    renderCombos();
     renderCart();
     if (location.hash === "#carrito") toggleCart(true);
     if (location.hash === "#ingresar") openAuth("login");

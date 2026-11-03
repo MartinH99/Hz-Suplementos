@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel admin | HZ Suplementos</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header scrolled">
+    <div class="container header__inner">
+      <a href="/" class="logo">HZ<span>ADMIN</span></a>
+      <div class="header__actions">
+        <a href="/cuenta.html" class="btn btn--ghost btn--sm">Mi cuenta</a>
+        <a href="/" class="btn btn--ghost btn--sm">← Tienda</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="account container">
+    <p class="account__loading" id="loading">Verificando permisos...</p>
+
+    <div id="adminApp" hidden>
+      <div class="account__hello">
+        <div>
+          <span class="tag">Administración</span>
+          <h1>PANEL <span class="accent">HZ</span></h1>
+          <p id="adminWho"></p>
+        </div>
+        <button class="btn btn--ghost btn--sm" id="refresh">↻ Actualizar</button>
+      </div>
+
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="resumen" role="tab">📊 Resumen</button>
+        <button class="tab" data-tab="pedidos" role="tab">📦 Pedidos <span class="tab__badge" id="pendingBadge" hidden></span></button>
+        <button class="tab" data-tab="clientes" role="tab">👥 Clientes</button>
+        <button class="tab" data-tab="productos" role="tab">🏷️ Productos</button>
+      </nav>
+
+      <!-- Resumen -->
+      <section class="panel" id="panel-resumen">
+        <div class="stats stats--admin" id="kpis"></div>
+        <div class="admin-grid">
+          <div class="card">
+            <h3>VENTAS ÚLTIMOS 14 DÍAS</h3>
+            <p>Pedidos no cancelados, por día.</p>
+            <div class="bars" id="salesChart"></div>
+          </div>
+          <div class="card">
+            <h3>MÁS VENDIDOS</h3>
+            <p>Unidades vendidas en pedidos no cancelados.</p>
+            <ol class="top-list" id="topList"></ol>
+          </div>
+        </div>
+      </section>
+
+      <!-- Pedidos -->
+      <section class="panel" id="panel-pedidos" hidden>
+        <div class="toolbar">
+          <div class="chips" id="statusFilter">
+            <button class="filter active" data-status="">Todos</button>
+            <button class="filter" data-status="pendiente">Pendientes</button>
+            <button class="filter" data-status="confirmado">Confirmados</button>
+            <button class="filter" data-status="enviado">Enviados</button>
+            <button class="filter" data-status="entregado">Entregados</button>
+            <button class="filter" data-status="cancelado">Cancelados</button>
+          </div>
+          <input class="search" id="orderSearch" type="search" placeholder="Buscar por #HZ, cliente, email o teléfono" aria-label="Buscar pedidos" />
+        </div>
+        <div class="orders" id="adminOrders"></div>
+      </section>
+
+      <!-- Clientes -->
+      <section class="panel" id="panel-clientes" hidden>
+        <div class="toolbar">
+          <p class="toolbar__count" id="usersCount"></p>
+          <input class="search" id="userSearch" type="search" placeholder="Buscar por nombre, email o teléfono" aria-label="Buscar clientes" />
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Cliente</th><th>Contacto</th><th>Ubicación</th><th>Pedidos</th><th>Total</th><th>Alta</th><th>Rol</th></tr></thead>
+            <tbody id="usersBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Productos -->
+      <section class="panel" id="panel-productos" hidden>
+        <p class="panel__note">Los cambios de precio y visibilidad se ven en la tienda en menos de un minuto. Un producto pausado no se muestra ni se puede comprar.</p>
+        <div class="table-wrap">
+          <table class="table table--products">
+            <thead><tr><th>Producto</th><th>Vendidos</th><th>Precio</th><th>Precio anterior</th><th>Visible</th><th></th></tr></thead>
+            <tbody id="productsBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="script.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
