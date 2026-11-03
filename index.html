@@ -36,6 +36,10 @@
         <a href="#faq">FAQ</a>
       </nav>
       <div class="header__actions">
+        <button class="cart-btn account-btn" id="accountBtn" aria-label="Ingresar">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+          <span class="account-btn__initial"></span>
+        </button>
         <button class="cart-btn" id="cartOpen" aria-label="Abrir carrito">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 2H2"/><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/></svg>
           <span class="cart-count" id="cartCount">0</span>
@@ -234,7 +238,7 @@
         <p>Suplementación deportiva de alto rendimiento.</p>
       </div>
       <div><h4>Tienda</h4><a href="#productos">Productos</a><a href="#combos">Combos</a><a href="#categorias">Categorías</a></div>
-      <div><h4>Ayuda</h4><a href="#faq">Preguntas frecuentes</a><a href="#">Envíos</a><a href="#">Cambios y devoluciones</a></div>
+      <div><h4>Ayuda</h4><a href="/cuenta.html">Mi cuenta</a><a href="#faq">Preguntas frecuentes</a><a href="#">Envíos</a><a href="#">Cambios y devoluciones</a></div>
       <div><h4>Contacto</h4><a href="#">WhatsApp</a><a href="#">Instagram</a><a href="#">contacto@hzsuplementos.com</a></div>
     </div>
     <p class="footer__legal">© 2026 HZ Suplementos. Los suplementos dietarios no reemplazan una alimentación equilibrada.</p>
@@ -249,10 +253,48 @@
     </div>
     <div class="cart__items" id="cartItems"></div>
     <div class="cart__foot">
+      <textarea id="orderNotes" class="cart__notes" rows="2" maxlength="500" placeholder="Notas del pedido (sabor, horario de entrega...)" aria-label="Notas del pedido"></textarea>
       <div class="cart__total"><span>Total</span><strong id="cartTotal">$0</strong></div>
-      <button class="btn btn--primary btn--block" id="checkout">Finalizar compra</button>
+      <button class="btn btn--primary btn--block" id="checkout">Finalizar compra por WhatsApp</button>
+      <p class="cart__hint" id="cartHint"></p>
     </div>
   </aside>
+
+  <!-- Ingreso / registro -->
+  <div class="modal" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <div class="modal__box">
+      <button class="cart__close modal__close" data-close-auth aria-label="Cerrar">✕</button>
+      <h3 id="authTitle" class="modal__title">TEAM <span class="accent">HZ</span></h3>
+      <p class="modal__msg" id="authMessage" hidden></p>
+      <div class="auth-tabs" role="tablist">
+        <button class="auth-tab active" data-auth-tab="login" role="tab">Ingresar</button>
+        <button class="auth-tab" data-auth-tab="register" role="tab">Crear cuenta</button>
+      </div>
+
+      <form class="form" id="loginForm" novalidate>
+        <label>Email<input type="email" name="email" autocomplete="email" required /></label>
+        <label>Contraseña<input type="password" name="password" autocomplete="current-password" required /></label>
+        <p class="form-error" role="alert"></p>
+        <button class="btn btn--primary btn--block" type="submit">Ingresar</button>
+        <p class="form-alt">¿No tenés cuenta? <button type="button" class="link" data-auth-tab="register">Registrate gratis</button></p>
+      </form>
+
+      <form class="form" id="registerForm" novalidate hidden>
+        <label>Nombre y apellido<input type="text" name="name" autocomplete="name" maxlength="80" required /></label>
+        <label>Email<input type="email" name="email" autocomplete="email" required /></label>
+        <label>WhatsApp / teléfono <small>(opcional)</small><input type="tel" name="phone" autocomplete="tel" maxlength="40" /></label>
+        <label>Contraseña <small>(mínimo 8 caracteres)</small><input type="password" name="password" autocomplete="new-password" minlength="8" required /></label>
+        <label class="check"><input type="checkbox" name="newsletter" checked /> Quiero recibir ofertas y novedades</label>
+        <p class="form-error" role="alert"></p>
+        <button class="btn btn--primary btn--block" type="submit">Crear mi cuenta</button>
+        <ul class="perks">
+          <li>📦 Historial de pedidos y repetir compras en 1 clic</li>
+          <li>❤️ Lista de favoritos</li>
+          <li>🚚 Tus datos de envío guardados</li>
+        </ul>
+      </form>
+    </div>
+  </div>
 
   <div class="toast" id="toast"></div>
 

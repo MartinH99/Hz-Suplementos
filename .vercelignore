@@ -1,0 +1,5 @@
+dev-server.mjs
+.claude
+*.db
+*.db-*
+.env*

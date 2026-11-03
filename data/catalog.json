@@ -1,0 +1,178 @@
+{
+  "products": [
+    {
+      "id": "whey-pro",
+      "name": "Whey Pro 2 lb",
+      "short": "WHEY<br>PRO",
+      "cat": "proteinas",
+      "desc": "Proteína de suero concentrada. 25 g por servicio. Sabor chocolate.",
+      "price": 32900,
+      "old": 38500,
+      "rating": 4.9,
+      "reviews": 412,
+      "badge": "-15%",
+      "tint": "#5b3a1e",
+      "icon": "💪"
+    },
+    {
+      "id": "isolate-zero",
+      "name": "Isolate Zero 2 lb",
+      "short": "ISO<br>ZERO",
+      "cat": "proteinas",
+      "desc": "Aislado de suero ultra filtrado. Sin lactosa ni azúcar.",
+      "price": 41500,
+      "rating": 4.8,
+      "reviews": 198,
+      "badge": "Nuevo",
+      "tint": "#1e3a5b",
+      "icon": "💪"
+    },
+    {
+      "id": "vegan-protein",
+      "name": "Vegan Protein 1 kg",
+      "short": "VEGAN<br>PROT",
+      "cat": "proteinas",
+      "desc": "Blend de arveja y arroz. 22 g de proteína vegetal.",
+      "price": 29900,
+      "rating": 4.7,
+      "reviews": 86,
+      "tint": "#2d4a1e",
+      "icon": "🌱"
+    },
+    {
+      "id": "bcaa",
+      "name": "BCAA 2:1:1 300 g",
+      "short": "BCAA<br>2:1:1",
+      "cat": "aminoacidos",
+      "desc": "Aminoácidos ramificados para recuperación muscular.",
+      "price": 18900,
+      "old": 22000,
+      "rating": 4.8,
+      "reviews": 265,
+      "badge": "-14%",
+      "tint": "#4a1e5b",
+      "icon": "🧬"
+    },
+    {
+      "id": "eaa",
+      "name": "EAA Recovery 400 g",
+      "short": "EAA<br>RECOV",
+      "cat": "aminoacidos",
+      "desc": "Los 9 aminoácidos esenciales + electrolitos.",
+      "price": 24500,
+      "rating": 4.9,
+      "reviews": 143,
+      "badge": "Nuevo",
+      "tint": "#5b1e3a",
+      "icon": "🧬"
+    },
+    {
+      "id": "glutamina",
+      "name": "Glutamina 300 g",
+      "short": "GLUTA<br>MINA",
+      "cat": "aminoacidos",
+      "desc": "L-Glutamina pura micronizada. Sin sabor.",
+      "price": 15900,
+      "rating": 4.6,
+      "reviews": 97,
+      "tint": "#3a3a3a",
+      "icon": "🧬"
+    },
+    {
+      "id": "creatina",
+      "name": "Creatina Monohidrato 300 g",
+      "short": "CREA<br>TINA",
+      "cat": "creatina",
+      "desc": "100% monohidrato micronizado. 60 servicios.",
+      "price": 19900,
+      "old": 23900,
+      "rating": 5,
+      "reviews": 530,
+      "badge": "Top ventas",
+      "tint": "#5b5b1e",
+      "icon": "⚡"
+    },
+    {
+      "id": "creatina-500",
+      "name": "Creatina Creapure® 500 g",
+      "short": "CREA<br>PURE",
+      "cat": "creatina",
+      "desc": "Creatina de máxima pureza importada de Alemania.",
+      "price": 34900,
+      "rating": 4.9,
+      "reviews": 211,
+      "tint": "#1e5b4a",
+      "icon": "⚡"
+    },
+    {
+      "id": "ignite",
+      "name": "Pre-entreno Ignite",
+      "short": "IGNI<br>TE",
+      "cat": "preentreno",
+      "desc": "Cafeína, beta-alanina y citrulina. Energía y bombeo.",
+      "price": 26900,
+      "old": 30500,
+      "rating": 4.8,
+      "reviews": 304,
+      "badge": "-12%",
+      "tint": "#5b1e1e",
+      "icon": "🔥"
+    },
+    {
+      "id": "pump",
+      "name": "Pump Stim-Free",
+      "short": "PUMP<br>FREE",
+      "cat": "preentreno",
+      "desc": "Pre-entreno sin estimulantes para entrenar de noche.",
+      "price": 23900,
+      "rating": 4.6,
+      "reviews": 74,
+      "tint": "#1e4a5b",
+      "icon": "🔥"
+    },
+    {
+      "id": "omega3",
+      "name": "Omega 3 · 120 caps",
+      "short": "OME<br>GA 3",
+      "cat": "vitaminas",
+      "desc": "EPA + DHA de alta concentración. Salud cardiovascular.",
+      "price": 14900,
+      "rating": 4.7,
+      "reviews": 158,
+      "tint": "#5b4a1e",
+      "icon": "🍊"
+    },
+    {
+      "id": "multi",
+      "name": "Multivitamínico Sport",
+      "short": "MULTI<br>VIT",
+      "cat": "vitaminas",
+      "desc": "23 vitaminas y minerales para deportistas.",
+      "price": 12900,
+      "rating": 4.7,
+      "reviews": 121,
+      "tint": "#5b2d1e",
+      "icon": "🍊"
+    }
+  ],
+  "combos": [
+    {
+      "id": "combo-volumen",
+      "name": "Combo Volumen",
+      "price": 54900,
+      "icon": "📦"
+    },
+    {
+      "id": "combo-rendimiento",
+      "name": "Combo Rendimiento",
+      "price": 62900,
+      "icon": "📦"
+    },
+    {
+      "id": "combo-definicion",
+      "name": "Combo Definición",
+      "price": 66500,
+      "icon": "📦"
+    }
+  ]
+}

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mi cuenta | HZ Suplementos</title>
+  <meta name="robots" content="noindex" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header scrolled">
+    <div class="container header__inner">
+      <a href="/" class="logo">HZ<span>SUPLEMENTOS</span></a>
+      <div class="header__actions">
+        <a href="/" class="btn btn--ghost btn--sm">← Tienda</a>
+        <a href="/#carrito" class="cart-btn" aria-label="Ver carrito">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 2H2"/><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/></svg>
+          <span class="cart-count" id="cartCount">0</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="account container">
+    <p class="account__loading" id="loading">Cargando tu cuenta...</p>
+
+    <div id="accountApp" hidden>
+      <div class="account__hello">
+        <div>
+          <span class="tag">Mi cuenta</span>
+          <h1>HOLA, <span class="accent" id="helloName"></span></h1>
+          <p id="helloEmail"></p>
+        </div>
+        <button class="btn btn--ghost btn--sm" id="logout">Cerrar sesión</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><strong id="statOrders">0</strong><span>Pedidos</span></div>
+        <div class="stat"><strong id="statSpent">$0</strong><span>Total invertido</span></div>
+        <div class="stat"><strong id="statFavs">0</strong><span>Favoritos</span></div>
+        <div class="stat"><strong id="statSince">—</strong><span>Miembro desde</span></div>
+      </div>
+
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="pedidos" role="tab">📦 Mis pedidos</button>
+        <button class="tab" data-tab="favoritos" role="tab">❤️ Favoritos</button>
+        <button class="tab" data-tab="datos" role="tab">👤 Mis datos</button>
+        <button class="tab" data-tab="seguridad" role="tab">🔒 Seguridad</button>
+      </nav>
+
+      <section class="panel" id="panel-pedidos">
+        <div class="orders" id="ordersList"></div>
+      </section>
+
+      <section class="panel" id="panel-favoritos" hidden>
+        <div class="favs" id="favsList"></div>
+      </section>
+
+      <section class="panel" id="panel-datos" hidden>
+        <form class="card form" id="profileForm">
+          <h3>DATOS PERSONALES Y DE ENVÍO</h3>
+          <p>Los usamos para completar automáticamente tus pedidos por WhatsApp.</p>
+          <div class="form-grid">
+            <label>Nombre y apellido<input name="name" autocomplete="name" maxlength="80" required /></label>
+            <label>Email<input name="email" type="email" disabled /></label>
+            <label>WhatsApp / teléfono<input name="phone" type="tel" autocomplete="tel" maxlength="40" /></label>
+            <label>Objetivo de entrenamiento
+              <select name="goal">
+                <option value="">Sin definir</option>
+                <option value="volumen">Ganar masa muscular</option>
+                <option value="definicion">Definición</option>
+                <option value="rendimiento">Rendimiento deportivo</option>
+                <option value="salud">Salud y bienestar</option>
+              </select>
+            </label>
+            <label class="full">Dirección (calle, número, piso)<input name="address" autocomplete="street-address" maxlength="160" /></label>
+            <label>Ciudad<input name="city" autocomplete="address-level2" maxlength="80" /></label>
+            <label>Provincia
+              <select name="province" autocomplete="address-level1">
+                <option value="">Elegí tu provincia</option>
+                <option>Buenos Aires</option><option>CABA</option><option>Catamarca</option><option>Chaco</option>
+                <option>Chubut</option><option>Córdoba</option><option>Corrientes</option><option>Entre Ríos</option>
+                <option>Formosa</option><option>Jujuy</option><option>La Pampa</option><option>La Rioja</option>
+                <option>Mendoza</option><option>Misiones</option><option>Neuquén</option><option>Río Negro</option>
+                <option>Salta</option><option>San Juan</option><option>San Luis</option><option>Santa Cruz</option>
+                <option>Santa Fe</option><option>Santiago del Estero</option><option>Tierra del Fuego</option><option>Tucumán</option>
+              </select>
+            </label>
+            <label>Código postal<input name="zip" autocomplete="postal-code" maxlength="12" /></label>
+            <label class="check full"><input type="checkbox" name="newsletter" /> Quiero recibir ofertas y novedades por email</label>
+          </div>
+          <p class="form-error" role="alert"></p>
+          <div class="form-actions">
+            <button class="btn btn--primary" type="submit">Guardar cambios</button>
+            <span class="form-ok" role="status"></span>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel" id="panel-seguridad" hidden>
+        <form class="card form" id="passwordForm">
+          <h3>CAMBIAR CONTRASEÑA</h3>
+          <p>Al cambiarla se cerrará la sesión en tus otros dispositivos.</p>
+          <div class="form-grid">
+            <label class="full">Contraseña actual<input name="current" type="password" autocomplete="current-password" required /></label>
+            <label>Nueva contraseña<input name="password" type="password" autocomplete="new-password" minlength="8" required /></label>
+            <label>Repetí la nueva contraseña<input name="confirm" type="password" autocomplete="new-password" minlength="8" required /></label>
+          </div>
+          <p class="form-error" role="alert"></p>
+          <div class="form-actions">
+            <button class="btn btn--primary" type="submit">Actualizar contraseña</button>
+            <span class="form-ok" role="status"></span>
+          </div>
+        </form>
+
+        <form class="card card--danger form" id="deleteForm">
+          <h3>ELIMINAR CUENTA</h3>
+          <p>Se borran tus datos, pedidos y favoritos de forma permanente. Esta acción no se puede deshacer.</p>
+          <label>Confirmá con tu contraseña<input name="password" type="password" autocomplete="current-password" required /></label>
+          <p class="form-error" role="alert"></p>
+          <div class="form-actions">
+            <button class="btn btn--danger" type="submit">Eliminar mi cuenta</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <p class="footer__legal">© 2026 HZ Suplementos. Los suplementos dietarios no reemplazan una alimentación equilibrada.</p>
+  </footer>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="script.js"></script>
+  <script src="cuenta.js"></script>
+</body>
+</html>
