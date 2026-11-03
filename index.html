@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HZ Suplementos | Rendimiento sin límites</title>
+  <meta name="description" content="Proteínas, aminoácidos, creatina y pre-entrenos de alta calidad. Envíos a todo el país." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Barra de anuncio -->
+  <div class="announce">
+    <div class="announce__track">
+      <span>🚚 ENVÍO GRATIS EN COMPRAS +$50.000</span>
+      <span>⚡ 3 CUOTAS SIN INTERÉS</span>
+      <span>🔥 10% OFF CON EL CÓDIGO <b>HZ10</b></span>
+      <span>🚚 ENVÍO GRATIS EN COMPRAS +$50.000</span>
+      <span>⚡ 3 CUOTAS SIN INTERÉS</span>
+      <span>🔥 10% OFF CON EL CÓDIGO <b>HZ10</b></span>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="header" id="header">
+    <div class="container header__inner">
+      <a href="#inicio" class="logo">HZ<span>SUPLEMENTOS</span></a>
+      <nav class="nav" id="nav">
+        <a href="#productos">Productos</a>
+        <a href="#categorias">Categorías</a>
+        <a href="#beneficios">Beneficios</a>
+        <a href="#combos">Combos</a>
+        <a href="#opiniones">Opiniones</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="header__actions">
+        <button class="cart-btn" id="cartOpen" aria-label="Abrir carrito">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 2H2"/><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/></svg>
+          <span class="cart-count" id="cartCount">0</span>
+        </button>
+        <button class="burger" id="burger" aria-label="Menú"><span></span><span></span><span></span></button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero" id="inicio">
+      <div class="hero__glow"></div>
+      <div class="container hero__inner">
+        <div class="hero__text">
+          <span class="tag">Nueva fórmula 2026</span>
+          <h1>SUPERÁ<br /><span class="outline">TUS</span> <span class="accent">LÍMITES</span></h1>
+          <p>Proteínas, aminoácidos, creatina y pre-entrenos con calidad certificada. Todo lo que tu cuerpo necesita para rendir más, recuperarse mejor y crecer.</p>
+          <div class="hero__cta">
+            <a href="#productos" class="btn btn--primary">Comprar ahora</a>
+            <a href="#combos" class="btn btn--ghost">Ver combos →</a>
+          </div>
+          <div class="hero__stats">
+            <div><strong data-count="25000">0</strong><span>Clientes</span></div>
+            <div><strong data-count="120">0</strong><span>Productos</span></div>
+            <div><strong>4.9★</strong><span>Valoración</span></div>
+          </div>
+        </div>
+        <div class="hero__visual">
+          <div class="jar jar--big">
+            <div class="jar__lid"></div>
+            <div class="jar__body">
+              <span class="jar__brand">HZ</span>
+              <span class="jar__name">WHEY<br />PRO</span>
+              <span class="jar__info">2 LB · 30 SERV</span>
+            </div>
+          </div>
+          <div class="float-card float-card--1"><b>25g</b> proteína por servicio</div>
+          <div class="float-card float-card--2"><b>0g</b> azúcar añadido</div>
+          <div class="ring"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Marcas / confianza -->
+    <section class="trust">
+      <div class="container trust__inner">
+        <div>✔ Calidad certificada ANMAT</div>
+        <div>✔ Envíos en 24/48 h</div>
+        <div>✔ Pago seguro</div>
+        <div>✔ Asesoramiento personalizado</div>
+      </div>
+    </section>
+
+    <!-- Categorías -->
+    <section class="section" id="categorias">
+      <div class="container">
+        <div class="section__head">
+          <span class="tag">Explorá</span>
+          <h2>CATEGORÍAS</h2>
+        </div>
+        <div class="cats">
+          <button class="cat" data-filter="proteinas"><span class="cat__icon">💪</span><h3>Proteínas</h3><p>Whey, isolate, vegana</p></button>
+          <button class="cat" data-filter="aminoacidos"><span class="cat__icon">🧬</span><h3>Aminoácidos</h3><p>BCAA, EAA, glutamina</p></button>
+          <button class="cat" data-filter="creatina"><span class="cat__icon">⚡</span><h3>Creatina</h3><p>Monohidrato puro</p></button>
+          <button class="cat" data-filter="preentreno"><span class="cat__icon">🔥</span><h3>Pre-entreno</h3><p>Energía y foco</p></button>
+          <button class="cat" data-filter="vitaminas"><span class="cat__icon">🍊</span><h3>Vitaminas</h3><p>Multi, omega 3, magnesio</p></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Productos -->
+    <section class="section section--dark" id="productos">
+      <div class="container">
+        <div class="section__head">
+          <span class="tag">Más vendidos</span>
+          <h2>NUESTROS PRODUCTOS</h2>
+        </div>
+        <div class="filters" id="filters">
+          <button class="filter active" data-filter="all">Todos</button>
+          <button class="filter" data-filter="proteinas">Proteínas</button>
+          <button class="filter" data-filter="aminoacidos">Aminoácidos</button>
+          <button class="filter" data-filter="creatina">Creatina</button>
+          <button class="filter" data-filter="preentreno">Pre-entreno</button>
+          <button class="filter" data-filter="vitaminas">Vitaminas</button>
+        </div>
+        <div class="products" id="products"></div>
+      </div>
+    </section>
+
+    <!-- Beneficios -->
+    <section class="section" id="beneficios">
+      <div class="container benefits">
+        <div class="benefits__text">
+          <span class="tag">Por qué elegirnos</span>
+          <h2>CIENCIA QUE SE <span class="accent">NOTA</span></h2>
+          <p>Cada producto pasa por análisis de laboratorio independientes. Sin rellenos, sin etiquetas engañosas: solo lo que dice el envase.</p>
+          <ul class="checks">
+            <li>Materias primas importadas de alta pureza</li>
+            <li>Dosis clínicamente efectivas</li>
+            <li>Aptos para controles antidoping</li>
+            <li>Sabores que te van a encantar</li>
+          </ul>
+        </div>
+        <div class="benefits__grid">
+          <div class="benefit"><span>01</span><h3>Más fuerza</h3><p>Creatina y pre-entrenos para potenciar cada serie.</p></div>
+          <div class="benefit"><span>02</span><h3>Recuperación</h3><p>BCAA y EAA para reducir el dolor muscular.</p></div>
+          <div class="benefit"><span>03</span><h3>Masa magra</h3><p>Proteínas de rápida absorción para crecer.</p></div>
+          <div class="benefit"><span>04</span><h3>Salud total</h3><p>Vitaminas y minerales para tu día a día.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Combos -->
+    <section class="section section--dark" id="combos">
+      <div class="container">
+        <div class="section__head">
+          <span class="tag">Ahorrá más</span>
+          <h2>COMBOS POR OBJETIVO</h2>
+        </div>
+        <div class="combos">
+          <article class="combo">
+            <h3>Volumen</h3>
+            <p class="combo__desc">Para ganar masa muscular</p>
+            <ul><li>Whey Pro 2 lb</li><li>Creatina 300 g</li><li>Shaker HZ</li></ul>
+            <div class="combo__price"><s>$68.500</s><strong>$54.900</strong></div>
+            <button class="btn btn--ghost add" data-id="combo-volumen">Agregar combo</button>
+          </article>
+          <article class="combo combo--featured">
+            <span class="combo__badge">Más elegido</span>
+            <h3>Rendimiento</h3>
+            <p class="combo__desc">Para entrenar al máximo</p>
+            <ul><li>Pre-entreno Ignite</li><li>BCAA 2:1:1</li><li>Creatina 300 g</li><li>Shaker HZ</li></ul>
+            <div class="combo__price"><s>$79.200</s><strong>$62.900</strong></div>
+            <button class="btn btn--primary add" data-id="combo-rendimiento">Agregar combo</button>
+          </article>
+          <article class="combo">
+            <h3>Definición</h3>
+            <p class="combo__desc">Para marcar y cuidar el músculo</p>
+            <ul><li>Isolate Zero 2 lb</li><li>EAA Recovery</li><li>Omega 3</li></ul>
+            <div class="combo__price"><s>$84.000</s><strong>$66.500</strong></div>
+            <button class="btn btn--ghost add" data-id="combo-definicion">Agregar combo</button>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Opiniones -->
+    <section class="section" id="opiniones">
+      <div class="container">
+        <div class="section__head">
+          <span class="tag">Comunidad HZ</span>
+          <h2>LO QUE DICEN</h2>
+        </div>
+        <div class="reviews">
+          <blockquote class="review"><div class="stars">★★★★★</div><p>“La whey se disuelve perfecto y el sabor chocolate es lo más. Noté la diferencia en la recuperación desde la primera semana.”</p><cite>Lucía R. · Crossfit</cite></blockquote>
+          <blockquote class="review"><div class="stars">★★★★★</div><p>“El pre-entreno Ignite da energía sin el bajón posterior. Envío rapidísimo, en 24 horas lo tenía.”</p><cite>Martín G. · Powerlifting</cite></blockquote>
+          <blockquote class="review"><div class="stars">★★★★★</div><p>“Uso los EAA en mis fondos largos y llego entero. Excelente atención para elegir lo que necesitaba.”</p><cite>Sofía P. · Running</cite></blockquote>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section section--dark" id="faq">
+      <div class="container faq">
+        <div class="section__head">
+          <span class="tag">Dudas</span>
+          <h2>PREGUNTAS FRECUENTES</h2>
+        </div>
+        <details><summary>¿Cuál es la diferencia entre BCAA y EAA?</summary><p>Los BCAA contienen 3 aminoácidos de cadena ramificada (leucina, isoleucina y valina). Los EAA incluyen los 9 aminoácidos esenciales, por lo que ofrecen un perfil más completo para la síntesis proteica.</p></details>
+        <details><summary>¿Cuándo conviene tomar creatina?</summary><p>Lo importante es la constancia: 3 a 5 g diarios, todos los días. Podés tomarla antes o después de entrenar, con agua o junto a tu batido.</p></details>
+        <details><summary>¿Cuánto tarda el envío?</summary><p>En CABA y GBA entregamos en 24/48 h hábiles. Al resto del país, entre 3 y 6 días hábiles.</p></details>
+        <details><summary>¿Necesito suplementos si como bien?</summary><p>Los suplementos complementan una buena alimentación, no la reemplazan. Te ayudan a llegar a tus requerimientos de forma práctica. Ante cualquier duda, consultá con un profesional de la salud.</p></details>
+      </div>
+    </section>
+
+    <!-- Newsletter -->
+    <section class="newsletter">
+      <div class="container newsletter__inner">
+        <div>
+          <h2>SUMATE AL <span class="accent">TEAM HZ</span></h2>
+          <p>Recibí ofertas exclusivas, rutinas y un 10% OFF en tu primera compra.</p>
+        </div>
+        <form class="newsletter__form" id="newsletter">
+          <input type="email" placeholder="Tu email" required aria-label="Email" />
+          <button class="btn btn--primary" type="submit">Suscribirme</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div>
+        <a href="#inicio" class="logo">HZ<span>SUPLEMENTOS</span></a>
+        <p>Suplementación deportiva de alto rendimiento.</p>
+      </div>
+      <div><h4>Tienda</h4><a href="#productos">Productos</a><a href="#combos">Combos</a><a href="#categorias">Categorías</a></div>
+      <div><h4>Ayuda</h4><a href="#faq">Preguntas frecuentes</a><a href="#">Envíos</a><a href="#">Cambios y devoluciones</a></div>
+      <div><h4>Contacto</h4><a href="#">WhatsApp</a><a href="#">Instagram</a><a href="#">contacto@hzsuplementos.com</a></div>
+    </div>
+    <p class="footer__legal">© 2026 HZ Suplementos. Los suplementos dietarios no reemplazan una alimentación equilibrada.</p>
+  </footer>
+
+  <!-- Carrito -->
+  <div class="overlay" id="overlay"></div>
+  <aside class="cart" id="cart" aria-label="Carrito">
+    <div class="cart__head">
+      <h3>TU CARRITO</h3>
+      <button class="cart__close" id="cartClose" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="cart__items" id="cartItems"></div>
+    <div class="cart__foot">
+      <div class="cart__total"><span>Total</span><strong id="cartTotal">$0</strong></div>
+      <button class="btn btn--primary btn--block" id="checkout">Finalizar compra</button>
+    </div>
+  </aside>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
