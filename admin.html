@@ -37,6 +37,8 @@
       <nav class="tabs" role="tablist">
         <button class="tab active" data-tab="resumen" role="tab">📊 Resumen</button>
         <button class="tab" data-tab="pedidos" role="tab">📦 Pedidos <span class="tab__badge" id="pendingBadge" hidden></span></button>
+        <button class="tab" data-tab="reparto" role="tab">🧾 Reparto</button>
+        <button class="tab" data-tab="caja" role="tab">💵 Caja</button>
         <button class="tab" data-tab="clientes" role="tab">👥 Clientes</button>
         <button class="tab" data-tab="productos" role="tab">🏷️ Productos</button>
         <button class="tab" data-tab="cupones" role="tab">🎟️ Cupones</button>
@@ -74,6 +76,67 @@
           <input class="search" id="orderSearch" type="search" placeholder="Buscar por #HZ, cliente, email o teléfono" aria-label="Buscar pedidos" />
         </div>
         <div class="orders" id="adminOrders"></div>
+      </section>
+
+      <!-- Reparto -->
+      <section class="panel" id="panel-reparto" hidden>
+        <div class="toolbar no-print">
+          <div class="chips" id="routeFilter">
+            <button class="filter active" data-route="todos">Todos</button>
+            <button class="filter" data-route="confirmado">Por salir</button>
+            <button class="filter" data-route="enviado">En camino</button>
+          </div>
+          <div class="toolbar__actions">
+            <select class="search search--select" id="routeZone" aria-label="Filtrar por zona"><option value="">Todas las zonas</option></select>
+            <button class="btn btn--ghost btn--sm" id="markSent">🚚 Marcar "por salir" como enviados</button>
+            <button class="btn btn--primary btn--sm" id="printRoute">🖨️ Imprimir hoja</button>
+          </div>
+        </div>
+        <div class="route-sheet" id="routeSheet"></div>
+      </section>
+
+      <!-- Caja -->
+      <section class="panel" id="panel-caja" hidden>
+        <div class="toolbar">
+          <label class="day-picker">Día <input type="date" id="cashDay" /></label>
+          <p class="toolbar__count">Cuenta como cobrado cada pedido marcado <b>Entregado</b> ese día.</p>
+        </div>
+        <div class="stats stats--admin" id="cashKpis"></div>
+        <div class="admin-grid">
+          <div class="card">
+            <h3>COBRADO EN EL DÍA</h3>
+            <p id="cashBreakdown"></p>
+            <div class="table-wrap">
+              <table class="table">
+                <thead><tr><th>Pedido</th><th>Cliente</th><th>Entrega</th><th>Hora</th><th>Monto</th></tr></thead>
+                <tbody id="cashOrders"></tbody>
+              </table>
+            </div>
+          </div>
+          <form class="card form" id="cashClose">
+            <h3>CIERRE DE CAJA</h3>
+            <p>Contá el efectivo y compará con lo que debería haber.</p>
+            <div class="cash-expected"><span>Debería haber</span><strong id="cashExpected">$0</strong></div>
+            <label>Efectivo contado ($)<input name="counted" type="number" min="0" step="100" inputmode="numeric" required /></label>
+            <p class="cash-diff" id="cashDiff"></p>
+            <label>Notas <small>(opcional)</small><input name="notes" maxlength="300" placeholder="Ej: faltante por vuelto mal dado" /></label>
+            <p class="form-error" role="alert"></p>
+            <div class="form-actions">
+              <button class="btn btn--primary" type="submit" id="cashCloseBtn">Cerrar caja</button>
+              <span class="form-ok" role="status"></span>
+            </div>
+            <p class="muted small" id="cashClosedInfo"></p>
+          </form>
+        </div>
+        <div class="card">
+          <h3>ÚLTIMOS CIERRES</h3>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Día</th><th>Esperado</th><th>Contado</th><th>Diferencia</th><th>Notas</th><th>Cerró</th></tr></thead>
+              <tbody id="cashHistory"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- Clientes -->

@@ -97,7 +97,10 @@ export const PATCH = handle(async (request) => {
   });
   if (!rows.length) throw new HttpError(400, "Solo se pueden cancelar pedidos pendientes");
   await db.batch([
-    { sql: "UPDATE orders SET status = 'cancelado' WHERE id = ? AND user_id = ? AND status = 'pendiente'", args: [Number(body.id), user.id] },
+    {
+      sql: "UPDATE orders SET status = 'cancelado', status_updated_at = datetime('now') WHERE id = ? AND user_id = ? AND status = 'pendiente'",
+      args: [Number(body.id), user.id],
+    },
     couponUsageDelta(rows[0].coupon_code, -1),
   ].filter(Boolean), "write");
   return json({ ok: true });

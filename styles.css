@@ -442,6 +442,55 @@ h2 { font-size: clamp(2.4rem, 6vw, 4rem); }
 .mini-textarea { width: 100%; padding: 12px 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; color: var(--text); font: inherit; resize: vertical; outline: none; }
 .mini-textarea:focus { border-color: var(--accent); }
 
+/* Panel admin: reparto y caja */
+.toolbar__actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.search--select { flex: none; min-width: 180px; appearance: auto; }
+.print-only { display: none; }
+.route-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 10px; }
+.route-head h3 { font-size: 2rem; }
+.route-totals { display: flex; gap: 12px; flex-wrap: wrap; }
+.route-totals div { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; display: grid; }
+.route-totals span { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.route-totals b { font-family: var(--display); font-weight: 400; font-size: 1.5rem; color: var(--accent); }
+.route-group { font-family: var(--display); font-weight: 400; font-size: 1.4rem; letter-spacing: .03em; margin: 26px 0 10px; }
+.route-group small { font-family: var(--body); font-size: .85rem; color: var(--muted); margin-left: 8px; letter-spacing: 0; }
+.route-table td { font-size: .85rem; line-height: 1.5; }
+.route-items { color: var(--muted); }
+.route-amount { font-size: 1rem; }
+.route-table .status { display: inline-block; margin-top: 4px; font-size: .62rem; padding: 3px 8px; }
+.day-picker { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+.day-picker input { padding: 10px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 999px; color: var(--text); font: inherit; color-scheme: dark; outline: none; }
+.cash-expected { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 16px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); }
+.cash-expected span { color: var(--muted); font-size: .85rem; }
+.cash-expected strong { font-family: var(--display); font-weight: 400; font-size: 2rem; }
+.cash-diff { font-weight: 800; min-height: 1.2em; }
+.diff--ok { color: var(--accent); }
+.diff--plus { color: #38bdf8; }
+.diff--minus { color: #ff6b4a; }
+.warn { color: #facc15; }
+
+@media print {
+  body.printing-route { background: #fff !important; color: #000 !important; }
+  body.printing-route .header, body.printing-route .account__hello, body.printing-route .tabs,
+  body.printing-route .no-print, body.printing-route .toast, body.printing-route .panel:not(#panel-reparto) { display: none !important; }
+  body.printing-route .account { padding: 0; }
+  body.printing-route .print-only { display: table-cell; }
+  body.printing-route p.print-only { display: block; margin-top: 30px; font-size: 12pt; }
+  body.printing-route * { color: #000 !important; background: transparent !important; box-shadow: none !important; }
+  body.printing-route .route-head h3 { font-size: 20pt; }
+  body.printing-route .route-totals div, body.printing-route .table-wrap { border: 1px solid #000 !important; border-radius: 0; }
+  body.printing-route .table { display: table !important; font-size: 9.5pt; }
+  body.printing-route .table thead { display: table-header-group !important; }
+  body.printing-route .table tbody { display: table-row-group !important; }
+  body.printing-route .table tr { display: table-row !important; border: none !important; padding: 0 !important; margin: 0 !important; page-break-inside: avoid; }
+  body.printing-route .table th, body.printing-route .table td { display: table-cell !important; border: 1px solid #000 !important; padding: 6px 8px !important; text-align: left !important; }
+  body.printing-route .table td::before { content: none !important; }
+  body.printing-route .table .no-print { display: none !important; }
+  body.printing-route .route-check { font-size: 16pt; text-align: center !important; }
+  body.printing-route .status { border: 1px solid #000; }
+  @page { margin: 12mm; }
+}
+
 /* Página restablecer contraseña */
 .reset { display: grid; place-items: center; }
 .reset__box { transform: none; width: min(460px, 100%); }

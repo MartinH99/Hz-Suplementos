@@ -262,6 +262,203 @@ async function saveCoupon(c, changes = {}) {
   await api("admin", { method: "POST", body: { action: "coupon-save", ...c, ...changes } });
 }
 
+// ===== Reparto =====
+const TZ = "America/Argentina/Buenos_Aires";
+const changeFor = (o) => (o.cashWith && o.cashWith > o.total ? o.cashWith - o.total : 0);
+// Los pedidos anteriores a las opciones de entrega no tienen zona
+const zoneOf = (o) => (o.deliveryMethod ? o.zone || "Sin zona" : "Entrega a coordinar");
+let routeCache = [];
+let routeFilter = "todos";
+
+async function loadRoute() {
+  ({ orders: routeCache } = await api("admin?view=route"));
+  const zones = [...new Set(routeCache.filter((o) => o.deliveryMethod !== "retiro").map(zoneOf))];
+  const sel = $("#routeZone");
+  const current = sel.value;
+  sel.innerHTML = `<option value="">Todas las zonas</option>` +
+    zones.map((z) => `<option>${esc(z)}</option>`).join("") + `<option value="__retiro">Solo retiros</option>`;
+  sel.value = [...sel.options].some((o) => o.value === current) ? current : "";
+  renderRoute();
+}
+
+function routeVisible() {
+  const zone = $("#routeZone").value;
+  return routeCache
+    .filter((o) => routeFilter === "todos" || o.status === routeFilter)
+    .filter((o) => !zone || (zone === "__retiro" ? o.deliveryMethod === "retiro" : o.deliveryMethod !== "retiro" && zoneOf(o) === zone));
+}
+
+function routeTable(title, list) {
+  if (!list.length) return "";
+  const rows = list.map((o, i) => `
+    <tr>
+      <td data-label="#">${i + 1}</td>
+      <td data-label="Pedido"><b>${code(o.id)}</b><br /><span class="status status--${o.status}">${STATUS_TEXT[o.status]}</span></td>
+      <td data-label="Cliente"><b>${esc(o.shipName)}</b>${o.shipPhone ? `<br />📞 ${esc(o.shipPhone)}` : ""}</td>
+      <td data-label="Entrega">${o.deliveryMethod === "retiro" ? "🏪 Retira en el local" : `📍 ${esc(o.shipAddress) || "—"}`}${o.timeSlot ? `<br />🕐 ${esc(o.timeSlot)}` : ""}${o.notes ? `<br />📝 ${esc(o.notes)}` : ""}</td>
+      <td data-label="Productos" class="route-items">${o.items.map((i) => `${i.qty}× ${esc(i.name)}`).join("<br />")}</td>
+      <td data-label="Cobrar"><b class="route-amount">${money(o.total)}</b></td>
+      <td data-label="Vuelto">${changeFor(o) ? `Paga con ${money(o.cashWith)}<br /><b>Vuelto ${money(changeFor(o))}</b>` : "Justo"}</td>
+      <td data-label="Acciones" class="row-actions no-print">
+        ${o.status === "confirmado" && o.deliveryMethod !== "retiro" ? `<button class="btn btn--ghost btn--sm" data-route-status="enviado" data-id="${o.id}">🚚 Enviado</button>` : ""}
+        <button class="btn btn--primary btn--sm" data-route-status="entregado" data-id="${o.id}">✔ Entregado</button>
+      </td>
+      <td class="print-only route-check">☐</td>
+    </tr>`).join("");
+  return `
+    <h4 class="route-group">${title} <small>${list.length} pedido${list.length === 1 ? "" : "s"} · ${money(list.reduce((s, o) => s + o.total, 0))}</small></h4>
+    <div class="table-wrap">
+      <table class="table route-table">
+        <thead><tr><th>#</th><th>Pedido</th><th>Cliente</th><th>Entrega</th><th>Productos</th><th>Cobrar</th><th>Vuelto</th><th class="no-print"></th><th class="print-only">Entregado</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderRoute() {
+  const list = routeVisible();
+  const sheet = $("#routeSheet");
+  if (!list.length) {
+    sheet.innerHTML = `<div class="empty"><span>🛵</span>No hay pedidos confirmados ni en camino.<br /><small>Confirmá pedidos en la pestaña Pedidos para que aparezcan acá.</small></div>`;
+    return;
+  }
+  const envios = list.filter((o) => o.deliveryMethod !== "retiro");
+  const retiros = list.filter((o) => o.deliveryMethod === "retiro");
+  const zones = [...new Set(envios.map(zoneOf))];
+  const totalChange = envios.reduce((s, o) => s + changeFor(o), 0);
+  const today = new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", timeZone: TZ });
+  sheet.innerHTML = `
+    <div class="route-head">
+      <div><h3>HOJA DE REPARTO</h3><p class="muted">${today}</p></div>
+      <div class="route-totals">
+        <div><span>Pedidos</span><b>${list.length}</b></div>
+        <div><span>A cobrar</span><b>${money(list.reduce((s, o) => s + o.total, 0))}</b></div>
+        <div><span>Cambio a llevar</span><b>${money(totalChange)}</b></div>
+      </div>
+    </div>
+    ${zones.map((z) => routeTable(`🚚 ${esc(z)}`, envios.filter((o) => zoneOf(o) === z))).join("")}
+    ${routeTable("🏪 Retiros en el local", retiros)}
+    <p class="print-only route-sign">Repartidor: ______________________ &nbsp; Efectivo rendido: $ ____________</p>`;
+}
+
+async function routeStatus(btn) {
+  btn.disabled = true;
+  try {
+    await api("admin", { method: "POST", body: { action: "order-status", id: Number(btn.dataset.id), status: btn.dataset.routeStatus } });
+    toast(`${code(btn.dataset.id)} → ${STATUS_TEXT[btn.dataset.routeStatus]}`);
+    loadRoute();
+    loadStats().catch(() => {});
+  } catch (err) {
+    btn.disabled = false;
+    toast(err.message);
+  }
+}
+
+async function markAllSent() {
+  const ids = routeVisible().filter((o) => o.status === "confirmado" && o.deliveryMethod !== "retiro").map((o) => o.id);
+  if (!ids.length) return toast("No hay envíos por salir en esta vista");
+  if (!confirm(`¿Marcar ${ids.length} pedido${ids.length === 1 ? "" : "s"} como enviado${ids.length === 1 ? "" : "s"}?`)) return;
+  try {
+    await api("admin", { method: "POST", body: { action: "order-status-bulk", ids, status: "enviado" } });
+    toast(`🚚 ${ids.length} pedido${ids.length === 1 ? "" : "s"} en camino`);
+    loadRoute();
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+function printRoute() {
+  if (!routeVisible().length) return toast("No hay pedidos para imprimir");
+  document.body.classList.add("printing-route");
+  window.print();
+  document.body.classList.remove("printing-route");
+}
+
+// ===== Caja =====
+const todayLocal = () => new Date().toLocaleDateString("en-CA", { timeZone: TZ });
+let cashData = null;
+
+async function loadCash() {
+  const input = $("#cashDay");
+  if (!input.value) input.value = todayLocal();
+  input.max = todayLocal();
+  cashData = await api(`admin?view=cash&day=${input.value}`);
+  const { collected, pending, orders, closing, history } = cashData;
+
+  $("#cashKpis").innerHTML = [
+    [money(collected.total), `Cobrado · ${collected.count} pedido${collected.count === 1 ? "" : "s"}`],
+    [money(collected.shipping), "Envíos cobrados"],
+    [money(collected.discount), "Descuentos dados"],
+    [`${money(pending.enviado.total)}<small>${pending.enviado.count} en camino</small>`, "En la calle (ahora)"],
+    [money(pending.enviado.change), "Cambio que llevan"],
+    [`${money(pending.confirmado.total)}<small>${pending.confirmado.count} pedidos</small>`, "Por salir (ahora)"],
+  ].map(([v, l]) => `<div class="stat"><strong>${v}</strong><span>${l}</span></div>`).join("");
+
+  $("#cashBreakdown").textContent = `🚚 ${collected.envio.count} envíos (${money(collected.envio.total)}) · 🏪 ${collected.retiro.count} retiros (${money(collected.retiro.total)})`;
+  $("#cashOrders").innerHTML = orders.length
+    ? orders.map((o) => `
+      <tr>
+        <td data-label="Pedido"><b>${code(o.id)}</b></td>
+        <td data-label="Cliente">${esc(o.shipName)}</td>
+        <td data-label="Entrega">${o.deliveryMethod === "retiro" ? "🏪 Retiro" : `🚚 ${esc(o.zone) || "Envío"}`}</td>
+        <td data-label="Hora">${toDate(o.deliveredAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: TZ })}</td>
+        <td data-label="Monto"><b>${money(o.total)}</b></td>
+      </tr>`).join("")
+    : `<tr><td colspan="5" class="muted">No hay pedidos entregados este día.</td></tr>`;
+
+  const f = $("#cashClose");
+  $("#cashExpected").textContent = money(collected.total);
+  f.elements.counted.value = closing ? closing.counted : "";
+  f.elements.notes.value = closing ? closing.notes : "";
+  f.querySelector(".form-error").textContent = "";
+  f.querySelector(".form-ok").textContent = "";
+  $("#cashCloseBtn").textContent = closing ? "Actualizar cierre" : "Cerrar caja";
+  $("#cashClosedInfo").innerHTML = closing
+    ? `Cerrada por ${esc(closing.closedBy)} el ${toDate(closing.createdAt).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: TZ })}` +
+      (closing.expected !== collected.total ? ` <b class="warn">Después del cierre se entregaron más pedidos: actualizalo.</b>` : "")
+    : "";
+  renderCashDiff();
+
+  $("#cashHistory").innerHTML = history.length
+    ? history.map((c) => `
+      <tr>
+        <td data-label="Día">${c.day.split("-").reverse().join("/")}</td>
+        <td data-label="Esperado">${money(c.expected)}</td>
+        <td data-label="Contado">${money(c.counted)}</td>
+        <td data-label="Diferencia"><b class="${c.difference < 0 ? "diff--minus" : c.difference > 0 ? "diff--plus" : "diff--ok"}">${c.difference === 0 ? "✔ $0" : (c.difference > 0 ? "+" : "-") + money(Math.abs(c.difference))}</b></td>
+        <td data-label="Notas">${esc(c.notes) || "—"}</td>
+        <td data-label="Cerró">${esc(c.closedBy)}</td>
+      </tr>`).join("")
+    : `<tr><td colspan="6" class="muted">Todavía no hay cierres.</td></tr>`;
+}
+
+function renderCashDiff() {
+  const raw = $("#cashClose").elements.counted.value;
+  const el = $("#cashDiff");
+  if (raw === "" || !cashData) { el.textContent = ""; el.className = "cash-diff"; return; }
+  const diff = Number(raw) - cashData.collected.total;
+  el.className = "cash-diff " + (diff === 0 ? "diff--ok" : diff > 0 ? "diff--plus" : "diff--minus");
+  el.textContent = diff === 0 ? "✔ La caja cuadra perfecto" : diff > 0 ? `Sobran ${money(diff)}` : `Faltan ${money(-diff)}`;
+}
+
+async function closeCash(e) {
+  e.preventDefault();
+  const f = e.target;
+  const btn = $("#cashCloseBtn");
+  f.querySelector(".form-error").textContent = "";
+  btn.disabled = true;
+  try {
+    await api("admin", { method: "POST", body: { action: "cash-close", day: $("#cashDay").value, counted: f.elements.counted.value, notes: f.elements.notes.value } });
+    toast("✔ Caja cerrada");
+    await loadCash();
+    f.querySelector(".form-ok").textContent = "✔ Cierre guardado";
+  } catch (err) {
+    f.querySelector(".form-error").textContent = err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // ===== Entregas =====
 function zoneRow(z = { id: "", name: "", price: "" }) {
   return `
@@ -350,7 +547,7 @@ async function saveProduct(tr, reset = false) {
 // ===== Eventos =====
 let searchTimer;
 const debounce = (fn) => { clearTimeout(searchTimer); searchTimer = setTimeout(fn, 300); };
-const loaders = { resumen: loadStats, pedidos: loadOrders, clientes: () => loadUsers($("#userSearch").value), productos: loadProducts, cupones: loadCoupons, entregas: loadDelivery };
+const loaders = { resumen: loadStats, pedidos: loadOrders, clientes: () => loadUsers($("#userSearch").value), productos: loadProducts, cupones: loadCoupons, entregas: loadDelivery, reparto: loadRoute, caja: loadCash };
 let currentTab = "resumen";
 
 function showTab(name) {
@@ -423,6 +620,25 @@ function bindEvents() {
   $("#couponCancel").addEventListener("click", resetCouponForm);
 
   $("#deliverySettings").addEventListener("submit", saveDelivery);
+
+  $("#routeFilter").addEventListener("click", (e) => {
+    const chip = e.target.closest("[data-route]");
+    if (!chip) return;
+    document.querySelectorAll("#routeFilter .filter").forEach((c) => c.classList.toggle("active", c === chip));
+    routeFilter = chip.dataset.route;
+    renderRoute();
+  });
+  $("#routeZone").addEventListener("change", renderRoute);
+  $("#markSent").addEventListener("click", markAllSent);
+  $("#printRoute").addEventListener("click", printRoute);
+  $("#routeSheet").addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-route-status]");
+    if (btn) routeStatus(btn);
+  });
+
+  $("#cashDay").addEventListener("change", () => loadCash().catch((err) => toast(err.message)));
+  $("#cashClose").addEventListener("submit", closeCash);
+  $("#cashClose").elements.counted.addEventListener("input", renderCashDiff);
   $("#addZone").addEventListener("click", () => {
     $("#zonesList").insertAdjacentHTML("beforeend", zoneRow());
     $("#zonesList .zone-row:last-child .zone-name").focus();

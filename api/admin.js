@@ -3,7 +3,43 @@ import { json, readJson, handle, str, HttpError } from "../lib/http.js";
 import { requireAdmin, createResetToken } from "../lib/auth.js";
 import { getCatalog, ALL_IDS } from "../lib/catalog.js";
 import { normalizeCode, publicCoupon, couponUsageDelta } from "../lib/coupons.js";
-import { orderFields } from "../lib/orders.js";
+import { orderFields, statusUpdateSql, LOCAL_OFFSET } from "../lib/orders.js";
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Pedidos con sus ítems (para listas del panel)
+async function withItems(db, rows) {
+  const ids = rows.map((o) => Number(o.id));
+  const items = ids.length
+    ? (await db.execute({ sql: `SELECT * FROM order_items WHERE order_id IN (${ids.map(() => "?").join(",")}) ORDER BY id`, args: ids })).rows
+    : [];
+  return rows.map((o) => ({
+    ...orderFields(o),
+    email: o.email,
+    items: items.filter((i) => Number(i.order_id) === Number(o.id))
+      .map((i) => ({ productId: i.product_id, name: i.name, price: num(i.price), qty: num(i.qty) })),
+  }));
+}
+
+// Cambia el estado de varios pedidos ajustando los usos de cupones (cancelar devuelve, reactivar cuenta)
+async function setStatus(db, ids, status) {
+  const { rows } = await db.execute({
+    sql: `SELECT id, status, coupon_code FROM orders WHERE id IN (${ids.map(() => "?").join(",")})`,
+    args: ids,
+  });
+  if (rows.length !== ids.length) throw new HttpError(404, "Pedido no encontrado");
+  const stmts = [];
+  for (const o of rows) {
+    stmts.push({ sql: statusUpdateSql, args: { status, id: Number(o.id) } });
+    const wasCancelled = o.status === "cancelado";
+    const isCancelled = status === "cancelado";
+    if (wasCancelled !== isCancelled) {
+      const delta = couponUsageDelta(o.coupon_code, isCancelled ? -1 : 1);
+      if (delta) stmts.push(delta);
+    }
+  }
+  await db.batch(stmts, "write");
+}
 import { getDelivery, cleanDelivery } from "../lib/settings.js";
 
 const STATUSES = new Set(["pendiente", "confirmado", "enviado", "entregado", "cancelado"]);
@@ -105,6 +141,58 @@ export const GET = handle(async (request) => {
 
   if (view === "delivery") return json({ delivery: await getDelivery(db) });
 
+  // Hoja de reparto: pedidos confirmados o en camino (envíos y retiros)
+  if (view === "route") {
+    const { rows } = await db.execute(`
+      SELECT o.*, u.email FROM orders o JOIN users u ON u.id = o.user_id
+      WHERE o.status IN ('confirmado', 'enviado') ORDER BY o.zone, o.time_slot, o.id`);
+    return json({ orders: await withItems(db, rows) });
+  }
+
+  // Caja de un día (fecha local): lo cobrado (entregados ese día) y lo que falta rendir
+  if (view === "cash") {
+    const day = DAY_RE.test(params.get("day") || "") ? params.get("day") : null;
+    if (!day) throw new HttpError(400, "Fecha inválida");
+    const [delivered, street, closing, history] = await db.batch([
+      {
+        sql: `SELECT o.*, u.email FROM orders o JOIN users u ON u.id = o.user_id
+              WHERE o.status = 'entregado' AND date(o.delivered_at, '${LOCAL_OFFSET}') = ? ORDER BY o.delivered_at`,
+        args: [day],
+      },
+      `SELECT status, COUNT(*) AS n, COALESCE(SUM(total), 0) AS total,
+              COALESCE(SUM(CASE WHEN cash_with > total THEN cash_with - total ELSE 0 END), 0) AS change
+       FROM orders WHERE status IN ('confirmado', 'enviado') GROUP BY status`,
+      { sql: "SELECT * FROM cash_closings WHERE day = ?", args: [day] },
+      "SELECT * FROM cash_closings ORDER BY day DESC LIMIT 15",
+    ], "read");
+    const orders = delivered.rows.map((o) => ({ ...orderFields(o), email: o.email }));
+    const sum = (list, f) => list.reduce((s, o) => s + f(o), 0);
+    const byMethod = (m) => orders.filter((o) => (o.deliveryMethod || "envio") === m);
+    const pending = Object.fromEntries(street.rows.map((r) => [r.status, { count: num(r.n), total: num(r.total), change: num(r.change) }]));
+    const closingRow = (c) => c && {
+      day: c.day, expected: num(c.expected), counted: num(c.counted), difference: num(c.counted) - num(c.expected),
+      notes: c.notes, closedBy: c.closed_by, createdAt: c.created_at,
+    };
+    return json({
+      day,
+      collected: {
+        total: sum(orders, (o) => o.total),
+        count: orders.length,
+        shipping: sum(orders, (o) => o.shipping),
+        discount: sum(orders, (o) => o.discount),
+        envio: { count: byMethod("envio").length, total: sum(byMethod("envio"), (o) => o.total) },
+        retiro: { count: byMethod("retiro").length, total: sum(byMethod("retiro"), (o) => o.total) },
+      },
+      orders,
+      pending: {
+        enviado: pending.enviado || { count: 0, total: 0, change: 0 },
+        confirmado: pending.confirmado || { count: 0, total: 0, change: 0 },
+      },
+      closing: closingRow(closing.rows[0]),
+      history: history.rows.map(closingRow),
+    });
+  }
+
   if (view === "coupons") {
     const { rows } = await db.execute(`
       SELECT c.*, COALESCE(SUM(CASE WHEN o.status != 'cancelado' THEN o.discount END), 0) AS discounted
@@ -125,15 +213,35 @@ export const POST = handle(async (request) => {
   switch (body.action) {
     case "order-status": {
       if (!STATUSES.has(body.status)) throw new HttpError(400, "Estado inválido");
-      const { rows } = await db.execute({ sql: "SELECT status, coupon_code FROM orders WHERE id = ?", args: [Number(body.id)] });
-      if (!rows[0]) throw new HttpError(404, "Pedido no encontrado");
-      // Cancelar devuelve el uso del cupón; reactivar lo vuelve a contar
-      const wasCancelled = rows[0].status === "cancelado";
-      const isCancelled = body.status === "cancelado";
-      await db.batch([
-        { sql: "UPDATE orders SET status = ? WHERE id = ?", args: [body.status, Number(body.id)] },
-        wasCancelled !== isCancelled ? couponUsageDelta(rows[0].coupon_code, isCancelled ? -1 : 1) : null,
-      ].filter(Boolean), "write");
+      await setStatus(db, [Number(body.id)], body.status);
+      return json({ ok: true });
+    }
+
+    case "order-status-bulk": {
+      if (!STATUSES.has(body.status)) throw new HttpError(400, "Estado inválido");
+      const ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(Number).filter(Boolean))].slice(0, 200);
+      if (!ids.length) throw new HttpError(400, "No hay pedidos seleccionados");
+      await setStatus(db, ids, body.status);
+      return json({ ok: true, updated: ids.length });
+    }
+
+    case "cash-close": {
+      const day = String(body.day || "");
+      if (!DAY_RE.test(day)) throw new HttpError(400, "Fecha inválida");
+      const counted = Math.round(Number(body.counted));
+      if (!(counted >= 0) || body.counted === "" || body.counted == null) throw new HttpError(400, "Ingresá el efectivo contado");
+      const { rows } = await db.execute({
+        sql: `SELECT COALESCE(SUM(total), 0) AS expected FROM orders
+              WHERE status = 'entregado' AND date(delivered_at, '${LOCAL_OFFSET}') = ?`,
+        args: [day],
+      });
+      await db.execute({
+        sql: `INSERT INTO cash_closings (day, expected, counted, notes, closed_by, created_at)
+              VALUES (?, ?, ?, ?, ?, datetime('now'))
+              ON CONFLICT(day) DO UPDATE SET expected = excluded.expected, counted = excluded.counted,
+                notes = excluded.notes, closed_by = excluded.closed_by, created_at = excluded.created_at`,
+        args: [day, num(rows[0].expected), counted, str(body.notes, 300), admin.name],
+      });
       return json({ ok: true });
     }
 
