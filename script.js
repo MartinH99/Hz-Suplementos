@@ -40,13 +40,18 @@ function renderDeliveryTexts() {
   });
 }
 
-// Actualiza precios de los combos (escritos en el HTML) y oculta los pausados
+// Actualiza precios y stock de los combos (escritos en el HTML) y oculta los pausados
 function renderCombos() {
   document.querySelectorAll(".combo").forEach((card) => {
-    const combo = COMBOS[card.querySelector(".add")?.dataset.id];
+    const btn = card.querySelector("button[data-id]");
+    const combo = COMBOS[btn?.dataset.id];
     card.hidden = !combo;
     if (!combo) return;
     card.querySelector(".combo__price").innerHTML = `${combo.old ? `<s>${money(combo.old)}</s>` : ""}<strong>${money(combo.price)}</strong>`;
+    btn.dataset.label ||= btn.textContent;
+    btn.disabled = combo.soldOut;
+    btn.classList.toggle("add", !combo.soldOut);
+    btn.textContent = combo.soldOut ? "Sin stock" : combo.lowStock ? `${btn.dataset.label} · ¡Quedan ${combo.lowStock}!` : btn.dataset.label;
   });
 }
 const findItem = (id) => PRODUCTS.find((p) => p.id === id) || COMBOS[id];
@@ -166,9 +171,9 @@ function renderProducts(filter = "all") {
   activeFilter = filter;
   const list = filter === "all" ? PRODUCTS : PRODUCTS.filter((p) => p.cat === filter);
   grid.innerHTML = list.map((p, i) => `
-    <article class="product" style="animation-delay:${i * 50}ms">
+    <article class="product ${p.soldOut ? "product--soldout" : ""}" style="animation-delay:${i * 50}ms">
       <div class="product__img" style="--tint:${p.tint}">
-        ${p.badge ? `<span class="badge ${p.badge === "Nuevo" ? "badge--new" : ""}">${p.badge}</span>` : ""}
+        ${p.soldOut ? `<span class="badge badge--soldout">Sin stock</span>` : p.badge ? `<span class="badge ${p.badge === "Nuevo" ? "badge--new" : ""}">${p.badge}</span>` : ""}
         <button class="fav-btn ${favorites.has(p.id) ? "active" : ""}" data-fav="${p.id}" aria-label="Agregar ${p.name} a favoritos" aria-pressed="${favorites.has(p.id)}">
           <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 21s-7.5-4.6-9.5-9.2C1.2 8.6 3.3 5 6.8 5c2 0 3.4 1.1 4.2 2.4h2C13.8 6.1 15.2 5 17.2 5c3.5 0 5.6 3.6 4.3 6.8C19.5 16.4 12 21 12 21z"/></svg>
         </button>
@@ -185,9 +190,12 @@ function renderProducts(filter = "all") {
         <h3 class="product__name">${p.name}</h3>
         <p class="product__desc">${p.desc}</p>
         <div class="product__rating">${"★".repeat(Math.round(p.rating))}<span>${p.rating} (${p.reviews})</span></div>
+        ${p.lowStock ? `<p class="low-stock">🔥 ¡Quedan ${p.lowStock}!</p>` : ""}
         <div class="product__foot">
           <div class="price">${p.old ? `<s>${money(p.old)}</s>` : ""}<strong>${money(p.price)}</strong></div>
-          <button class="add-btn add" data-id="${p.id}" aria-label="Agregar ${p.name} al carrito">+</button>
+          ${p.soldOut
+            ? `<button class="add-btn" disabled aria-label="${p.name} sin stock">✕</button>`
+            : `<button class="add-btn add" data-id="${p.id}" aria-label="Agregar ${p.name} al carrito">+</button>`}
         </div>
       </div>
     </article>`).join("");
@@ -287,6 +295,7 @@ function renderCart() {
           <div class="cart-item__thumb">${item.icon}</div>
           <div class="cart-item__info">
             <h4>${item.name}</h4>
+            ${item.soldOut ? `<small class="cart-item__warn">Sin stock: quitalo para continuar</small>` : ""}
             <span>${money(item.price * cart[id])}</span>
             <div class="qty">
               <button data-qty="-1" data-id="${id}" aria-label="Quitar uno">−</button>
@@ -300,6 +309,7 @@ function renderCart() {
 }
 
 function addToCart(id) {
+  if (findItem(id)?.soldOut) return toast("Ese producto está sin stock");
   cart[id] = (cart[id] || 0) + 1;
   saveCart();
   renderCart();

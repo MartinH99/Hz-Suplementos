@@ -491,6 +491,25 @@ h2 { font-size: clamp(2.4rem, 6vw, 4rem); }
   @page { margin: 12mm; }
 }
 
+/* Stock en la tienda */
+.product--soldout .product__img .jar { filter: grayscale(1) opacity(.45); }
+.product--soldout .price strong { color: var(--muted); }
+.badge--soldout { background: #3f3f46; color: var(--text); }
+.add-btn:disabled { background: var(--card); color: var(--muted); border: 1px solid var(--line); cursor: not-allowed; transform: none; box-shadow: none; }
+.low-stock { color: var(--accent-2); font-size: .8rem; font-weight: 700; margin: -8px 0 12px; }
+.cart-item__warn { display: block; color: #ff6b4a; font-size: .75rem; font-weight: 600; }
+.combo .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Panel admin: stock */
+.stock-qty { font-family: var(--display); font-size: 1.6rem; }
+.stock-qty--out { color: #ff6b4a; }
+.stock-qty--low { color: #facc15; }
+.stock-qty--ok { color: var(--accent); }
+.stock-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.stock-actions .mini-input { width: 90px; padding: 8px 10px; }
+.move-in { color: var(--accent); font-weight: 700; }
+.move-out { color: #ff6b4a; font-weight: 700; }
+
 /* Página restablecer contraseña */
 .reset { display: grid; place-items: center; }
 .reset__box { transform: none; width: min(460px, 100%); }

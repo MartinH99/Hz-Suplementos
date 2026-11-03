@@ -459,6 +459,97 @@ async function closeCash(e) {
   }
 }
 
+// ===== Stock =====
+const MOVE_REASON = { venta: "Venta", cancelacion: "Cancelación", reactivacion: "Pedido reactivado", ingreso: "Ingreso", ajuste: "Ajuste" };
+const stockLevel = (p) => (p.qty === 0 ? "out" : p.qty <= p.lowAlert ? "low" : "ok");
+
+async function loadStock() {
+  const { products, combos, movements } = await api("admin?view=stock");
+  updateStockBadge(products);
+  $("#stockBody").innerHTML = products.map((p) => `
+    <tr data-stock="${p.id}">
+      <td data-label="Producto"><b>${esc(p.name)}</b><br /><small>${CAT_LABEL[p.cat]}${p.active ? "" : " · pausado"}</small></td>
+      <td data-label="Stock">${p.tracked
+        ? `<span class="stock-qty stock-qty--${stockLevel(p)}">${p.qty}</span> <small>${stockLevel(p) === "out" ? "sin stock" : stockLevel(p) === "low" ? "stock bajo" : "u."}</small>`
+        : `<span class="muted">Sin control</span>`}</td>
+      <td data-label="Alerta si quedan">${p.tracked
+        ? `<input class="mini-input" type="number" min="0" value="${p.lowAlert}" data-stock-alert aria-label="Alerta de stock bajo de ${esc(p.name)}" style="width:80px" />`
+        : "—"}</td>
+      <td data-label="Vendidos 30 días">${p.tracked ? p.sold30 : "—"}</td>
+      <td class="row-actions">
+        <div class="stock-actions">
+          ${p.tracked
+            ? `<input class="mini-input" type="number" min="0" placeholder="Cant." data-stock-qty aria-label="Cantidad para ${esc(p.name)}" />
+               <button class="btn btn--primary btn--sm" data-stock-move="add" title="Suma unidades (llegó mercadería)">+ Ingreso</button>
+               <button class="btn btn--ghost btn--sm" data-stock-move="set" title="Corrige el stock al número exacto que contaste">Ajustar a</button>
+               <button class="link small" data-stock-untrack>Quitar control</button>`
+            : `<input class="mini-input" type="number" min="0" placeholder="Stock" data-stock-qty aria-label="Stock inicial de ${esc(p.name)}" />
+               <button class="btn btn--ghost btn--sm" data-stock-track>Controlar stock</button>`}
+        </div>
+      </td>
+    </tr>`).join("");
+
+  $("#comboStockBody").innerHTML = combos.map((c) => `
+    <tr>
+      <td data-label="Combo"><b>${esc(c.name)}</b>${c.active ? "" : "<br /><small>pausado</small>"}</td>
+      <td data-label="Se pueden armar">${c.available === null ? `<span class="muted">Sin control</span>` : `<span class="stock-qty stock-qty--${c.available === 0 ? "out" : c.available <= 3 ? "low" : "ok"}">${c.available}</span>`}</td>
+      <td data-label="Productos">${c.parts.map((p) => `${p.qty}× ${esc(p.name)} <small>(${p.stock === null ? "sin control" : `stock ${p.stock}`})</small>`).join("<br />")}</td>
+    </tr>`).join("");
+
+  $("#movesBody").innerHTML = movements.length
+    ? movements.map((m) => `
+      <tr>
+        <td data-label="Fecha">${dateTime(m.createdAt)}</td>
+        <td data-label="Producto">${esc(m.name)}</td>
+        <td data-label="Cantidad"><span class="${m.delta > 0 ? "move-in" : "move-out"}">${m.delta > 0 ? "+" : ""}${m.delta}</span></td>
+        <td data-label="Motivo">${MOVE_REASON[m.reason] || esc(m.reason)}</td>
+        <td data-label="Detalle">${m.orderId ? code(m.orderId) : ""}${m.note ? esc(m.note) : ""}${!m.orderId && !m.note ? "—" : ""}</td>
+        <td data-label="Por">${esc(m.by) || "—"}</td>
+      </tr>`).join("")
+    : `<tr><td colspan="6" class="muted">Todavía no hay movimientos.</td></tr>`;
+}
+
+function updateStockBadge(products) {
+  const alerts = products.filter((p) => p.tracked && p.active && stockLevel(p) !== "ok").length;
+  const badge = $("#stockBadge");
+  badge.hidden = !alerts;
+  badge.textContent = alerts;
+}
+
+async function stockAction(row, body, okMsg) {
+  row.querySelectorAll("button, input").forEach((el) => (el.disabled = true));
+  try {
+    await api("admin", { method: "POST", body: { id: row.dataset.stock, ...body } });
+    toast(okMsg);
+    await loadStock();
+  } catch (err) {
+    toast(err.message);
+    row.querySelectorAll("button, input").forEach((el) => (el.disabled = false));
+  }
+}
+
+function onStockClick(e) {
+  const row = e.target.closest("[data-stock]");
+  if (!row) return;
+  const qty = row.querySelector("[data-stock-qty]")?.value ?? "";
+  const name = row.querySelector("b").textContent;
+  if (e.target.closest("[data-stock-track]")) {
+    if (qty === "") return toast("Ingresá cuántas unidades tenés hoy");
+    stockAction(row, { action: "stock-track", qty }, `Control de stock activado para ${name}`);
+  }
+  const move = e.target.closest("[data-stock-move]");
+  if (move) {
+    if (qty === "") return toast("Ingresá una cantidad");
+    const add = move.dataset.stockMove === "add";
+    const note = add ? "" : prompt(`Motivo del ajuste de ${name} (opcional):`, "Conteo de inventario");
+    if (note === null) return;
+    stockAction(row, { action: "stock-move", mode: add ? "add" : "set", qty, note }, add ? `+${qty} unidades de ${name}` : `Stock de ${name} ajustado a ${qty}`);
+  }
+  if (e.target.closest("[data-stock-untrack]") && confirm(`¿Dejar de controlar el stock de ${name}? Se va a poder vender sin límite.`)) {
+    stockAction(row, { action: "stock-untrack" }, `${name} ya no controla stock`);
+  }
+}
+
 // ===== Entregas =====
 function zoneRow(z = { id: "", name: "", price: "" }) {
   return `
@@ -547,7 +638,7 @@ async function saveProduct(tr, reset = false) {
 // ===== Eventos =====
 let searchTimer;
 const debounce = (fn) => { clearTimeout(searchTimer); searchTimer = setTimeout(fn, 300); };
-const loaders = { resumen: loadStats, pedidos: loadOrders, clientes: () => loadUsers($("#userSearch").value), productos: loadProducts, cupones: loadCoupons, entregas: loadDelivery, reparto: loadRoute, caja: loadCash };
+const loaders = { resumen: loadStats, pedidos: loadOrders, clientes: () => loadUsers($("#userSearch").value), productos: loadProducts, cupones: loadCoupons, entregas: loadDelivery, reparto: loadRoute, caja: loadCash, stock: loadStock };
 let currentTab = "resumen";
 
 function showTab(name) {
@@ -621,6 +712,13 @@ function bindEvents() {
 
   $("#deliverySettings").addEventListener("submit", saveDelivery);
 
+  $("#stockBody").addEventListener("click", onStockClick);
+  $("#stockBody").addEventListener("change", (e) => {
+    if (!e.target.matches("[data-stock-alert]")) return;
+    const row = e.target.closest("[data-stock]");
+    stockAction(row, { action: "stock-alert", lowAlert: e.target.value }, "Alerta actualizada");
+  });
+
   $("#routeFilter").addEventListener("click", (e) => {
     const chip = e.target.closest("[data-route]");
     if (!chip) return;
@@ -687,6 +785,7 @@ function bindEvents() {
     const initial = location.hash.slice(1);
     showTab(loaders[initial] ? initial : "resumen");
     if (initial !== "resumen" && initial in loaders) loadStats().catch(() => {});
+    if (initial !== "stock") api("admin?view=stock").then((d) => updateStockBadge(d.products)).catch(() => {});
   } catch (err) {
     $("#loading").textContent = "No pudimos cargar el panel. " + err.message;
   }

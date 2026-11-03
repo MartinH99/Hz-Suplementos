@@ -1,9 +1,12 @@
 import { getDb } from "../lib/db.js";
 import { json, readJson, handle, str, HttpError } from "../lib/http.js";
 import { requireAdmin, createResetToken } from "../lib/auth.js";
-import { getCatalog, ALL_IDS } from "../lib/catalog.js";
+import { getCatalog, ALL_IDS, PRODUCT_IDS } from "../lib/catalog.js";
 import { normalizeCode, publicCoupon, couponUsageDelta } from "../lib/coupons.js";
 import { orderFields, statusUpdateSql, LOCAL_OFFSET } from "../lib/orders.js";
+import {
+  getInventory, available, comboItems, productName, restockStatements, redeductStatements, isStockConflict,
+} from "../lib/stock.js";
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -21,8 +24,8 @@ async function withItems(db, rows) {
   }));
 }
 
-// Cambia el estado de varios pedidos ajustando los usos de cupones (cancelar devuelve, reactivar cuenta)
-async function setStatus(db, ids, status) {
+// Cambia el estado de varios pedidos ajustando cupones y stock (cancelar devuelve, reactivar vuelve a descontar)
+async function setStatus(db, ids, status, by) {
   const { rows } = await db.execute({
     sql: `SELECT id, status, coupon_code FROM orders WHERE id IN (${ids.map(() => "?").join(",")})`,
     args: ids,
@@ -36,9 +39,13 @@ async function setStatus(db, ids, status) {
     if (wasCancelled !== isCancelled) {
       const delta = couponUsageDelta(o.coupon_code, isCancelled ? -1 : 1);
       if (delta) stmts.push(delta);
+      stmts.push(...(isCancelled ? await restockStatements(db, Number(o.id), by) : await redeductStatements(db, Number(o.id), by)));
     }
   }
-  await db.batch(stmts, "write");
+  await db.batch(stmts, "write").catch((err) => {
+    if (isStockConflict(err)) throw new HttpError(409, "No hay stock suficiente para reactivar esos pedidos");
+    throw err;
+  });
 }
 import { getDelivery, cleanDelivery } from "../lib/settings.js";
 
@@ -193,6 +200,34 @@ export const GET = handle(async (request) => {
     });
   }
 
+  if (view === "stock") {
+    const [{ products, combos }, inv, sold, moves] = await Promise.all([
+      getCatalog({ includeHidden: true }),
+      getInventory(db),
+      db.execute(`SELECT product_id, -SUM(delta) AS qty FROM stock_movements
+                  WHERE order_id IS NOT NULL AND created_at >= datetime('now', '-30 days') GROUP BY product_id`),
+      db.execute("SELECT * FROM stock_movements ORDER BY id DESC LIMIT 60"),
+    ]);
+    const soldBy = new Map(sold.rows.map((r) => [r.product_id, num(r.qty)]));
+    return json({
+      products: products.map((p) => {
+        const s = inv.get(p.id);
+        return {
+          id: p.id, name: p.name, cat: p.cat, active: p.active,
+          tracked: !!s, qty: s?.qty ?? null, lowAlert: s?.lowAlert ?? 3, sold30: soldBy.get(p.id) || 0,
+        };
+      }),
+      combos: combos.map((c) => ({
+        id: c.id, name: c.name, active: c.active, available: available(c.id, inv),
+        parts: (comboItems(c.id) || []).map((i) => ({ name: productName(i.id), qty: i.qty, stock: inv.get(i.id)?.qty ?? null })),
+      })),
+      movements: moves.rows.map((m) => ({
+        id: num(m.id), productId: m.product_id, name: productName(m.product_id), delta: num(m.delta), reason: m.reason,
+        orderId: m.order_id == null ? null : num(m.order_id), note: m.note, by: m.created_by, createdAt: m.created_at,
+      })),
+    });
+  }
+
   if (view === "coupons") {
     const { rows } = await db.execute(`
       SELECT c.*, COALESCE(SUM(CASE WHEN o.status != 'cancelado' THEN o.discount END), 0) AS discounted
@@ -213,7 +248,7 @@ export const POST = handle(async (request) => {
   switch (body.action) {
     case "order-status": {
       if (!STATUSES.has(body.status)) throw new HttpError(400, "Estado inválido");
-      await setStatus(db, [Number(body.id)], body.status);
+      await setStatus(db, [Number(body.id)], body.status, admin.name);
       return json({ ok: true });
     }
 
@@ -221,7 +256,7 @@ export const POST = handle(async (request) => {
       if (!STATUSES.has(body.status)) throw new HttpError(400, "Estado inválido");
       const ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(Number).filter(Boolean))].slice(0, 200);
       if (!ids.length) throw new HttpError(400, "No hay pedidos seleccionados");
-      await setStatus(db, ids, body.status);
+      await setStatus(db, ids, body.status, admin.name);
       return json({ ok: true, updated: ids.length });
     }
 
@@ -312,6 +347,58 @@ export const POST = handle(async (request) => {
         args: [JSON.stringify(delivery)],
       });
       return json({ delivery });
+    }
+
+    // Stock: activar control (con stock inicial), desactivarlo, ingresar mercadería, ajustar o cambiar la alerta
+    case "stock-track": {
+      if (!PRODUCT_IDS.has(body.id)) throw new HttpError(400, "Solo los productos llevan stock (los combos se arman con ellos)");
+      const qty = Math.round(Number(body.qty));
+      if (!(qty >= 0 && qty < 1_000_000) || body.qty === "") throw new HttpError(400, "Ingresá el stock inicial");
+      await db.batch([
+        { sql: "INSERT INTO inventory (product_id, qty) VALUES (?, ?) ON CONFLICT(product_id) DO NOTHING", args: [body.id, qty] },
+        { sql: "INSERT INTO stock_movements (product_id, delta, reason, note, created_by) VALUES (?, ?, 'ajuste', 'Stock inicial', ?)", args: [body.id, qty, admin.name] },
+      ], "write");
+      return json({ ok: true });
+    }
+
+    case "stock-untrack": {
+      await db.execute({ sql: "DELETE FROM inventory WHERE product_id = ?", args: [String(body.id)] });
+      return json({ ok: true });
+    }
+
+    case "stock-move": {
+      const inv = await getInventory(db);
+      const current = inv.get(body.id);
+      if (!current) throw new HttpError(400, "Ese producto no tiene control de stock");
+      const value = Math.round(Number(body.qty));
+      if (body.qty === "" || !Number.isFinite(value)) throw new HttpError(400, "Ingresá una cantidad");
+      let delta;
+      if (body.mode === "add") {
+        if (!(value > 0)) throw new HttpError(400, "El ingreso tiene que ser de 1 unidad o más");
+        delta = value;
+      } else {
+        if (!(value >= 0)) throw new HttpError(400, "El stock no puede ser negativo");
+        delta = value - current.qty;
+        if (!delta) throw new HttpError(400, "El stock ya es ese");
+      }
+      await db.batch([
+        { sql: "UPDATE inventory SET qty = qty + ?, updated_at = datetime('now') WHERE product_id = ?", args: [delta, body.id] },
+        {
+          sql: "INSERT INTO stock_movements (product_id, delta, reason, note, created_by) VALUES (?, ?, ?, ?, ?)",
+          args: [body.id, delta, body.mode === "add" ? "ingreso" : "ajuste", str(body.note, 200), admin.name],
+        },
+      ], "write").catch((err) => {
+        if (isStockConflict(err)) throw new HttpError(409, "El stock cambió mientras lo editabas. Actualizá y probá de nuevo.");
+        throw err;
+      });
+      return json({ ok: true });
+    }
+
+    case "stock-alert": {
+      const lowAlert = Math.round(Number(body.lowAlert));
+      if (!(lowAlert >= 0 && lowAlert < 10_000)) throw new HttpError(400, "Alerta inválida");
+      await db.execute({ sql: "UPDATE inventory SET low_alert = ? WHERE product_id = ?", args: [lowAlert, String(body.id)] });
+      return json({ ok: true });
     }
 
     case "coupon-delete": {

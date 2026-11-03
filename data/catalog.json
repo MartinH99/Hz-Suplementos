@@ -161,21 +161,59 @@
       "name": "Combo Volumen",
       "price": 54900,
       "old": 68500,
-      "icon": "📦"
+      "icon": "📦",
+      "items": [
+        {
+          "id": "whey-pro",
+          "qty": 1
+        },
+        {
+          "id": "creatina",
+          "qty": 1
+        }
+      ]
     },
     {
       "id": "combo-rendimiento",
       "name": "Combo Rendimiento",
       "price": 62900,
       "old": 79200,
-      "icon": "📦"
+      "icon": "📦",
+      "items": [
+        {
+          "id": "ignite",
+          "qty": 1
+        },
+        {
+          "id": "bcaa",
+          "qty": 1
+        },
+        {
+          "id": "creatina",
+          "qty": 1
+        }
+      ]
     },
     {
       "id": "combo-definicion",
       "name": "Combo Definición",
       "price": 66500,
       "old": 84000,
-      "icon": "📦"
+      "icon": "📦",
+      "items": [
+        {
+          "id": "isolate-zero",
+          "qty": 1
+        },
+        {
+          "id": "eaa",
+          "qty": 1
+        },
+        {
+          "id": "omega3",
+          "qty": 1
+        }
+      ]
     }
   ]
 }

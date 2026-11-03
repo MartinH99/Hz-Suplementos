@@ -41,6 +41,7 @@
         <button class="tab" data-tab="caja" role="tab">💵 Caja</button>
         <button class="tab" data-tab="clientes" role="tab">👥 Clientes</button>
         <button class="tab" data-tab="productos" role="tab">🏷️ Productos</button>
+        <button class="tab" data-tab="stock" role="tab">📦 Stock <span class="tab__badge" id="stockBadge" hidden></span></button>
         <button class="tab" data-tab="cupones" role="tab">🎟️ Cupones</button>
         <button class="tab" data-tab="entregas" role="tab">🚚 Entregas</button>
       </nav>
@@ -161,6 +162,36 @@
             <thead><tr><th>Producto</th><th>Vendidos</th><th>Precio</th><th>Precio anterior</th><th>Visible</th><th></th></tr></thead>
             <tbody id="productsBody"></tbody>
           </table>
+        </div>
+      </section>
+
+      <!-- Stock -->
+      <section class="panel" id="panel-stock" hidden>
+        <p class="panel__note">Activá el control en los productos que quieras seguir. Cada pedido descuenta stock y, si se cancela, lo devuelve. Un producto sin control se puede vender siempre. Los combos usan el stock de sus productos.</p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Producto</th><th>Stock</th><th>Alerta si quedan</th><th>Vendidos 30 días</th><th></th></tr></thead>
+            <tbody id="stockBody"></tbody>
+          </table>
+        </div>
+        <div class="card" style="margin-top:20px">
+          <h3>COMBOS</h3>
+          <p>Disponibles según el stock de sus productos.</p>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Combo</th><th>Se pueden armar</th><th>Productos</th></tr></thead>
+              <tbody id="comboStockBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <h3>ÚLTIMOS MOVIMIENTOS</h3>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Motivo</th><th>Detalle</th><th>Por</th></tr></thead>
+              <tbody id="movesBody"></tbody>
+            </table>
+          </div>
         </div>
       </section>
 

@@ -6,5 +6,9 @@ import { getDelivery } from "../lib/settings.js";
 // GET /api/catalog → catálogo público con precios y productos activos, más las opciones de entrega
 export const GET = handle(async () => {
   const [catalog, delivery] = await Promise.all([getCatalog(), getDb().then(getDelivery)]);
-  return json({ ...catalog, delivery }, 200, { "cache-control": "public, max-age=0, s-maxage=30, stale-while-revalidate=60" });
+  // El navegador siempre pide datos frescos (stock); la CDN de Vercel cachea unos segundos
+  return json({ ...catalog, delivery }, 200, {
+    "cache-control": "public, max-age=0, must-revalidate",
+    "vercel-cdn-cache-control": "s-maxage=10, stale-while-revalidate=20",
+  });
 });

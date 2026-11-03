@@ -5,6 +5,7 @@ import { buildLines } from "../lib/catalog.js";
 import { validateCoupon, couponUsageDelta } from "../lib/coupons.js";
 import { getDelivery, quoteDelivery } from "../lib/settings.js";
 import { orderFields } from "../lib/orders.js";
+import { expand, getInventory, checkStock, deductStatements, restockStatements, isStockConflict } from "../lib/stock.js";
 
 // GET /api/orders → historial de pedidos con sus productos
 export const GET = handle(async (request) => {
@@ -52,7 +53,12 @@ export const POST = handle(async (request) => {
   const shipAddress = delivery.method === "retiro" ? "Retiro en el local" : delivery.address;
   const shipPhone = str(body.delivery?.phone, 40) || user.phone;
 
-  // Un solo batch = una transacción atómica: pedido, ítems y uso del cupón se guardan juntos o nada.
+  // Stock: verificamos con mensaje claro y descontamos en el mismo batch (el CHECK cubre ventas simultáneas)
+  const need = expand(lines);
+  const inv = await getInventory(db);
+  checkStock(need, inv);
+
+  // Un solo batch = una transacción atómica: pedido, ítems, stock y uso del cupón se guardan juntos o nada.
   const [created] = await db.batch([
     {
       sql: `INSERT INTO orders (user_id, total, discount, coupon_code, notes, ship_name, ship_phone, ship_address,
@@ -74,7 +80,11 @@ export const POST = handle(async (request) => {
       ? [{ sql: "UPDATE users SET address = ? WHERE id = ? AND address = ''", args: [delivery.address, user.id] }]
       : []),
     ...(shipPhone && !user.phone ? [{ sql: "UPDATE users SET phone = ? WHERE id = ? AND phone = ''", args: [shipPhone, user.id] }] : []),
-  ], "write");
+    ...deductStatements(need, inv, { orderIdSql: "(SELECT MAX(id) FROM orders WHERE user_id = ?)", orderIdArgs: [user.id], by: user.name }),
+  ], "write").catch((err) => {
+    if (isStockConflict(err)) throw new HttpError(409, "Uno de los productos se agotó mientras comprabas. Revisá el carrito.");
+    throw err;
+  });
 
   return json({
     order: {
@@ -102,6 +112,7 @@ export const PATCH = handle(async (request) => {
       args: [Number(body.id), user.id],
     },
     couponUsageDelta(rows[0].coupon_code, -1),
+    ...(await restockStatements(db, Number(body.id), user.name)),
   ].filter(Boolean), "write");
   return json({ ok: true });
 });
