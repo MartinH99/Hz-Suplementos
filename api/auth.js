@@ -2,7 +2,7 @@ import { getDb } from "../lib/db.js";
 import { json, readJson, handle, str, HttpError } from "../lib/http.js";
 import {
   hashPassword, verifyPassword, createSession, destroySession, revokeOtherSessions,
-  getUser, requireUser, publicUser, USER_FIELDS,
+  getUser, requireUser, publicUser, findResetUser, USER_FIELDS,
 } from "../lib/auth.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -61,6 +61,24 @@ export const POST = handle(async (request) => {
       await db.execute({ sql: "UPDATE users SET password_hash = ? WHERE id = ?", args: [await hashPassword(body.password), user.id] });
       await revokeOtherSessions(request, user.id);
       return json({ ok: true });
+    }
+
+    // Recuperación con link de un solo uso (lo genera el admin y lo envía por WhatsApp)
+    case "reset-check": {
+      const target = await findResetUser(body.token);
+      return json({ name: target.name.split(" ")[0], email: target.email });
+    }
+
+    case "reset": {
+      const target = await findResetUser(body.token);
+      checkPassword(body.password);
+      await db.batch([
+        { sql: "UPDATE users SET password_hash = ? WHERE id = ?", args: [await hashPassword(body.password), target.id] },
+        { sql: "UPDATE password_resets SET used_at = ? WHERE token_hash = ?", args: [Date.now(), target.tokenHash] },
+        { sql: "DELETE FROM sessions WHERE user_id = ?", args: [target.id] },
+      ], "write");
+      const { rows } = await db.execute({ sql: `SELECT ${USER_FIELDS} FROM users WHERE id = ?`, args: [target.id] });
+      return json({ user: publicUser(rows[0]) }, 200, { "set-cookie": await createSession(target.id) });
     }
 
     default:

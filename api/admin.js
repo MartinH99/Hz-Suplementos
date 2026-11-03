@@ -1,7 +1,8 @@
 import { getDb } from "../lib/db.js";
 import { json, readJson, handle, str, HttpError } from "../lib/http.js";
-import { requireAdmin } from "../lib/auth.js";
+import { requireAdmin, createResetToken } from "../lib/auth.js";
 import { getCatalog, ALL_IDS } from "../lib/catalog.js";
+import { normalizeCode, publicCoupon, couponUsageDelta } from "../lib/coupons.js";
 
 const STATUSES = new Set(["pendiente", "confirmado", "enviado", "entregado", "cancelado"]);
 const num = (v) => Number(v ?? 0);
@@ -61,6 +62,7 @@ export const GET = handle(async (request) => {
     return json({
       orders: rows.map((o) => ({
         id: Number(o.id), status: o.status, total: num(o.total), notes: o.notes, email: o.email,
+        discount: num(o.discount), couponCode: o.coupon_code,
         shipName: o.ship_name, shipPhone: o.ship_phone, shipAddress: o.ship_address, createdAt: o.created_at,
         items: items.filter((i) => Number(i.order_id) === Number(o.id))
           .map((i) => ({ productId: i.product_id, name: i.name, price: num(i.price), qty: num(i.qty) })),
@@ -100,6 +102,14 @@ export const GET = handle(async (request) => {
     return json({ products: products.map(withSold), combos: combos.map(withSold) });
   }
 
+  if (view === "coupons") {
+    const { rows } = await db.execute(`
+      SELECT c.*, COALESCE(SUM(CASE WHEN o.status != 'cancelado' THEN o.discount END), 0) AS discounted
+      FROM coupons c LEFT JOIN orders o ON o.coupon_code = c.code
+      GROUP BY c.code ORDER BY c.created_at DESC`);
+    return json({ coupons: rows.map((r) => ({ ...publicCoupon(r), discounted: num(r.discounted) })) });
+  }
+
   throw new HttpError(400, "Vista desconocida");
 });
 
@@ -112,8 +122,15 @@ export const POST = handle(async (request) => {
   switch (body.action) {
     case "order-status": {
       if (!STATUSES.has(body.status)) throw new HttpError(400, "Estado inválido");
-      const { rowsAffected } = await db.execute({ sql: "UPDATE orders SET status = ? WHERE id = ?", args: [body.status, Number(body.id)] });
-      if (!rowsAffected) throw new HttpError(404, "Pedido no encontrado");
+      const { rows } = await db.execute({ sql: "SELECT status, coupon_code FROM orders WHERE id = ?", args: [Number(body.id)] });
+      if (!rows[0]) throw new HttpError(404, "Pedido no encontrado");
+      // Cancelar devuelve el uso del cupón; reactivar lo vuelve a contar
+      const wasCancelled = rows[0].status === "cancelado";
+      const isCancelled = body.status === "cancelado";
+      await db.batch([
+        { sql: "UPDATE orders SET status = ? WHERE id = ?", args: [body.status, Number(body.id)] },
+        wasCancelled !== isCancelled ? couponUsageDelta(rows[0].coupon_code, isCancelled ? -1 : 1) : null,
+      ].filter(Boolean), "write");
       return json({ ok: true });
     }
 
@@ -144,6 +161,50 @@ export const POST = handle(async (request) => {
     case "product-reset": {
       await db.execute({ sql: "DELETE FROM product_overrides WHERE product_id = ?", args: [String(body.id)] });
       return json({ ok: true });
+    }
+
+    case "coupon-save": {
+      const code = normalizeCode(body.code);
+      if (!/^[A-Z0-9_-]{3,30}$/.test(code)) throw new HttpError(400, "El código debe tener 3 a 30 letras o números, sin espacios");
+      if (!["percent", "fixed"].includes(body.type)) throw new HttpError(400, "Tipo de descuento inválido");
+      const value = Math.round(Number(body.value));
+      if (body.type === "percent" && !(value >= 1 && value <= 100)) throw new HttpError(400, "El porcentaje tiene que estar entre 1 y 100");
+      if (body.type === "fixed" && !(value >= 1 && value < 100_000_000)) throw new HttpError(400, "Monto de descuento inválido");
+      const minTotal = Math.max(0, Math.round(Number(body.minTotal) || 0));
+      const maxUses = body.maxUses === "" || body.maxUses == null ? null : Math.round(Number(body.maxUses));
+      if (maxUses !== null && !(maxUses >= 1)) throw new HttpError(400, "El límite de usos tiene que ser 1 o más");
+      const expiresAt = body.expiresAt ? String(body.expiresAt).slice(0, 10) : null;
+      if (expiresAt && !/^\d{4}-\d{2}-\d{2}$/.test(expiresAt)) throw new HttpError(400, "Fecha de vencimiento inválida");
+      const args = [body.type, value, minTotal, maxUses, body.oncePerUser ? 1 : 0, expiresAt, body.active === false ? 0 : 1, code];
+      if (body.isNew) {
+        const exists = await db.execute({ sql: "SELECT 1 FROM coupons WHERE code = ?", args: [code] });
+        if (exists.rows.length) throw new HttpError(409, "Ya existe un cupón con ese código");
+        await db.execute({
+          sql: "INSERT INTO coupons (type, value, min_total, max_uses, once_per_user, expires_at, active, code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+          args,
+        });
+      } else {
+        const { rowsAffected } = await db.execute({
+          sql: "UPDATE coupons SET type = ?, value = ?, min_total = ?, max_uses = ?, once_per_user = ?, expires_at = ?, active = ? WHERE code = ?",
+          args,
+        });
+        if (!rowsAffected) throw new HttpError(404, "Cupón no encontrado");
+      }
+      return json({ ok: true });
+    }
+
+    case "coupon-delete": {
+      // Los pedidos conservan el código usado; solo se borra la definición del cupón
+      await db.execute({ sql: "DELETE FROM coupons WHERE code = ?", args: [normalizeCode(body.code)] });
+      return json({ ok: true });
+    }
+
+    case "reset-link": {
+      const { rows } = await db.execute({ sql: "SELECT id, name, phone FROM users WHERE id = ?", args: [Number(body.id)] });
+      if (!rows[0]) throw new HttpError(404, "Usuario no encontrado");
+      const { token, expiresAt } = await createResetToken(Number(rows[0].id));
+      const url = `${new URL(request.url).origin}/restablecer.html#${token}`;
+      return json({ url, expiresAt, name: rows[0].name, phone: rows[0].phone });
     }
 
     default:

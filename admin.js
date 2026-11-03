@@ -91,6 +91,7 @@ async function loadOrders() {
       </div>
       <ul class="order__items">
         ${o.items.map((i) => `<li><span>${i.qty} × ${esc(i.name)}</span><span>${money(i.price * i.qty)}</span></li>`).join("")}
+        ${o.discount ? `<li class="order__discount"><span>🎟️ Cupón ${esc(o.couponCode)}</span><span>-${money(o.discount)}</span></li>` : ""}
       </ul>
       ${o.notes ? `<div class="order__meta"><span>📝 ${esc(o.notes)}</span></div>` : ""}
       <div class="order__foot">
@@ -141,8 +142,9 @@ async function loadUsers(q = "") {
         <td data-label="Rol">${u.id === me.id
           ? `<span class="role role--admin">Admin (vos)</span>`
           : `<button class="role role--${u.role}" data-role-for="${u.id}" data-role="${u.role === "admin" ? "customer" : "admin"}" title="Cambiar rol">${u.role === "admin" ? "Admin" : "Cliente"}</button>`}</td>
+        <td data-label="Contraseña"><button class="btn btn--ghost btn--sm" data-reset-for="${u.id}" title="Genera un link de un solo uso, válido 24 h">🔑 Link de acceso</button></td>
       </tr>`).join("")
-    : `<tr><td colspan="7" class="muted">No se encontraron clientes.</td></tr>`;
+    : `<tr><td colspan="8" class="muted">No se encontraron clientes.</td></tr>`;
 }
 
 async function changeRole(btn) {
@@ -158,6 +160,88 @@ async function changeRole(btn) {
     btn.disabled = false;
     toast(err.message);
   }
+}
+
+// Link para que el cliente elija una contraseña nueva: se envía por WhatsApp o se copia
+async function sendResetLink(btn) {
+  btn.disabled = true;
+  try {
+    const { url, name, phone } = await api("admin", { method: "POST", body: { action: "reset-link", id: Number(btn.dataset.resetFor) } });
+    const text = `¡Hola ${name.split(" ")[0]}! Te escribimos de HZ Suplementos 💪\n\nEntrá a este link para crear tu nueva contraseña (vale por 24 horas y se usa una sola vez):\n${url}`;
+    if (waPhone(phone)) {
+      window.open(`https://wa.me/${waPhone(phone)}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+      toast("Link generado: se abrió WhatsApp para enviarlo");
+    } else {
+      await navigator.clipboard.writeText(url).then(
+        () => toast("El cliente no tiene teléfono: copiamos el link al portapapeles"),
+        () => prompt("Copiá este link y envíaselo al cliente:", url)
+      );
+    }
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ===== Cupones =====
+let couponsCache = [];
+const couponLabel = (c) => (c.type === "percent" ? `${c.value}% OFF` : `${money(c.value)} OFF`);
+
+async function loadCoupons() {
+  ({ coupons: couponsCache } = await api("admin?view=coupons"));
+  $("#couponsBody").innerHTML = couponsCache.length
+    ? couponsCache.map((c) => {
+        const expired = c.expiresAt && c.expiresAt < new Date().toISOString().slice(0, 10);
+        const conditions = [c.minTotal ? `Mín. ${money(c.minTotal)}` : "", c.oncePerUser ? "1 por cliente" : ""].filter(Boolean).join(" · ") || "—";
+        return `
+        <tr data-coupon="${esc(c.code)}" class="${c.active && !expired ? "" : "is-paused"}">
+          <td data-label="Código"><b class="coupon-code">${esc(c.code)}</b></td>
+          <td data-label="Descuento">${couponLabel(c)}</td>
+          <td data-label="Condiciones">${conditions}</td>
+          <td data-label="Usos">${c.uses}${c.maxUses ? ` / ${c.maxUses}` : ""}</td>
+          <td data-label="Ahorro dado">${money(c.discounted)}</td>
+          <td data-label="Vence">${c.expiresAt ? c.expiresAt.split("-").reverse().join("/") + (expired ? " <small>(vencido)</small>" : "") : "—"}</td>
+          <td data-label="Activo"><label class="switch"><input type="checkbox" data-coupon-toggle ${c.active ? "checked" : ""} /><span></span></label></td>
+          <td class="row-actions">
+            <button class="btn btn--ghost btn--sm" data-coupon-edit>Editar</button>
+            <button class="btn btn--danger btn--sm" data-coupon-delete>Borrar</button>
+          </td>
+        </tr>`;
+      }).join("")
+    : `<tr><td colspan="8" class="muted">Todavía no hay cupones.</td></tr>`;
+}
+
+function editCoupon(code) {
+  const c = couponsCache.find((x) => x.code === code);
+  const f = $("#couponForm");
+  f.elements.code.value = c.code;
+  f.elements.code.readOnly = true;
+  f.elements.type.value = c.type;
+  f.elements.value.value = c.value;
+  f.elements.minTotal.value = c.minTotal || "";
+  f.elements.maxUses.value = c.maxUses ?? "";
+  f.elements.expiresAt.value = c.expiresAt || "";
+  f.elements.oncePerUser.checked = c.oncePerUser;
+  f.elements.active.checked = c.active;
+  f.dataset.editing = c.code;
+  $("#couponFormTitle").textContent = `EDITAR ${c.code}`;
+  $("#couponCancel").hidden = false;
+  f.scrollIntoView({ behavior: "smooth" });
+}
+
+function resetCouponForm() {
+  const f = $("#couponForm");
+  f.reset();
+  f.elements.code.readOnly = false;
+  delete f.dataset.editing;
+  $("#couponFormTitle").textContent = "NUEVO CUPÓN";
+  $("#couponCancel").hidden = true;
+  f.querySelector(".form-error").textContent = "";
+}
+
+async function saveCoupon(c, changes = {}) {
+  await api("admin", { method: "POST", body: { action: "coupon-save", ...c, ...changes } });
 }
 
 // ===== Productos =====
@@ -200,7 +284,7 @@ async function saveProduct(tr, reset = false) {
 // ===== Eventos =====
 let searchTimer;
 const debounce = (fn) => { clearTimeout(searchTimer); searchTimer = setTimeout(fn, 300); };
-const loaders = { resumen: loadStats, pedidos: loadOrders, clientes: () => loadUsers($("#userSearch").value), productos: loadProducts };
+const loaders = { resumen: loadStats, pedidos: loadOrders, clientes: () => loadUsers($("#userSearch").value), productos: loadProducts, cupones: loadCoupons };
 let currentTab = "resumen";
 
 function showTab(name) {
@@ -231,9 +315,46 @@ function bindEvents() {
   }));
   $("#userSearch").addEventListener("input", (e) => debounce(() => loadUsers(e.target.value.trim()).catch((err) => toast(err.message))));
 
-  document.addEventListener("change", (e) => {
+  document.addEventListener("change", async (e) => {
     if (e.target.matches("[data-status-for]")) changeStatus(e.target);
+    if (e.target.matches("[data-coupon-toggle]")) {
+      const c = couponsCache.find((x) => x.code === e.target.closest("tr").dataset.coupon);
+      try {
+        await saveCoupon(c, { active: e.target.checked });
+        toast(`${c.code} ${e.target.checked ? "activado" : "pausado"}`);
+        loadCoupons();
+      } catch (err) {
+        e.target.checked = !e.target.checked;
+        toast(err.message);
+      }
+    }
   });
+
+  $("#couponForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const btn = f.querySelector("button[type=submit]");
+    const errorEl = f.querySelector(".form-error");
+    const data = Object.fromEntries(new FormData(f));
+    errorEl.textContent = "";
+    btn.disabled = true;
+    try {
+      await saveCoupon({
+        ...data,
+        isNew: !f.dataset.editing,
+        oncePerUser: f.elements.oncePerUser.checked,
+        active: f.elements.active.checked,
+      });
+      toast(`✔ Cupón ${data.code.toUpperCase()} guardado`);
+      resetCouponForm();
+      loadCoupons();
+    } catch (err) {
+      errorEl.textContent = err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  $("#couponCancel").addEventListener("click", resetCouponForm);
   document.addEventListener("click", (e) => {
     const notify = e.target.closest("[data-notify]");
     if (notify) notifyCustomer(Number(notify.dataset.notify));
@@ -243,6 +364,19 @@ function bindEvents() {
     if (save) saveProduct(save.closest("tr"));
     const reset = e.target.closest("[data-reset-product]");
     if (reset) saveProduct(reset.closest("tr"), true);
+    const resetLink = e.target.closest("[data-reset-for]");
+    if (resetLink) sendResetLink(resetLink);
+    const editC = e.target.closest("[data-coupon-edit]");
+    if (editC) editCoupon(editC.closest("tr").dataset.coupon);
+    const delC = e.target.closest("[data-coupon-delete]");
+    if (delC) {
+      const code = delC.closest("tr").dataset.coupon;
+      if (confirm(`¿Borrar el cupón ${code}? Los pedidos que ya lo usaron no cambian.`)) {
+        api("admin", { method: "POST", body: { action: "coupon-delete", code } })
+          .then(() => { toast(`Cupón ${code} borrado`); loadCoupons(); })
+          .catch((err) => toast(err.message));
+      }
+    }
   });
 }
 

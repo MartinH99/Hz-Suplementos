@@ -39,6 +39,7 @@
         <button class="tab" data-tab="pedidos" role="tab">📦 Pedidos <span class="tab__badge" id="pendingBadge" hidden></span></button>
         <button class="tab" data-tab="clientes" role="tab">👥 Clientes</button>
         <button class="tab" data-tab="productos" role="tab">🏷️ Productos</button>
+        <button class="tab" data-tab="cupones" role="tab">🎟️ Cupones</button>
       </nav>
 
       <!-- Resumen -->
@@ -82,7 +83,7 @@
         </div>
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th>Cliente</th><th>Contacto</th><th>Ubicación</th><th>Pedidos</th><th>Total</th><th>Alta</th><th>Rol</th></tr></thead>
+            <thead><tr><th>Cliente</th><th>Contacto</th><th>Ubicación</th><th>Pedidos</th><th>Total</th><th>Alta</th><th>Rol</th><th>Contraseña</th></tr></thead>
             <tbody id="usersBody"></tbody>
           </table>
         </div>
@@ -95,6 +96,40 @@
           <table class="table table--products">
             <thead><tr><th>Producto</th><th>Vendidos</th><th>Precio</th><th>Precio anterior</th><th>Visible</th><th></th></tr></thead>
             <tbody id="productsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Cupones -->
+      <section class="panel" id="panel-cupones" hidden>
+        <form class="card form" id="couponForm">
+          <h3 id="couponFormTitle">NUEVO CUPÓN</h3>
+          <p>Los clientes lo cargan en el carrito. Requiere tener cuenta.</p>
+          <div class="form-grid form-grid--3">
+            <label>Código<input name="code" maxlength="30" placeholder="EJ: VERANO20" required /></label>
+            <label>Tipo
+              <select name="type">
+                <option value="percent">Porcentaje (%)</option>
+                <option value="fixed">Monto fijo ($)</option>
+              </select>
+            </label>
+            <label>Valor<input name="value" type="number" min="1" required placeholder="10" /></label>
+            <label>Compra mínima ($) <small>(opcional)</small><input name="minTotal" type="number" min="0" step="100" placeholder="0" /></label>
+            <label>Límite de usos <small>(vacío = sin límite)</small><input name="maxUses" type="number" min="1" placeholder="∞" /></label>
+            <label>Vence el <small>(opcional)</small><input name="expiresAt" type="date" /></label>
+            <label class="check"><input type="checkbox" name="oncePerUser" /> Una vez por cliente</label>
+            <label class="check"><input type="checkbox" name="active" checked /> Activo</label>
+          </div>
+          <p class="form-error" role="alert"></p>
+          <div class="form-actions">
+            <button class="btn btn--primary" type="submit">Guardar cupón</button>
+            <button class="btn btn--ghost" type="button" id="couponCancel" hidden>Cancelar edición</button>
+          </div>
+        </form>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Código</th><th>Descuento</th><th>Condiciones</th><th>Usos</th><th>Ahorro dado</th><th>Vence</th><th>Activo</th><th></th></tr></thead>
+            <tbody id="couponsBody"></tbody>
           </table>
         </div>
       </section>

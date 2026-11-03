@@ -39,6 +39,7 @@ function renderOrders() {
       </div>
       <ul class="order__items">
         ${o.items.map((i) => `<li><span>${i.qty} × ${esc(i.name)}</span><span>${money(i.price * i.qty)}</span></li>`).join("")}
+        ${o.discount ? `<li class="order__discount"><span>🎟️ Cupón ${esc(o.couponCode)}</span><span>-${money(o.discount)}</span></li>` : ""}
       </ul>
       <div class="order__meta">
         ${o.shipAddress ? `<span>📦 ${esc(o.shipAddress)}</span>` : ""}

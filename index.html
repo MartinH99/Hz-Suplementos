@@ -253,7 +253,17 @@
     </div>
     <div class="cart__items" id="cartItems"></div>
     <div class="cart__foot">
+      <form class="coupon" id="couponForm">
+        <input id="couponInput" type="text" maxlength="30" placeholder="Código de descuento" aria-label="Código de descuento" autocomplete="off" />
+        <button class="btn btn--ghost btn--sm" type="submit">Aplicar</button>
+      </form>
+      <div class="coupon-applied" id="couponApplied" hidden>
+        <span>🎟️ <b id="couponCode"></b> <small id="couponDesc"></small></span>
+        <button type="button" class="link" id="couponRemove">Quitar</button>
+      </div>
       <textarea id="orderNotes" class="cart__notes" rows="2" maxlength="500" placeholder="Notas del pedido (sabor, horario de entrega...)" aria-label="Notas del pedido"></textarea>
+      <div class="cart__line" id="subtotalLine" hidden><span>Subtotal</span><span id="cartSubtotal">$0</span></div>
+      <div class="cart__line cart__line--discount" id="discountLine" hidden><span>Descuento</span><span id="cartDiscount">-$0</span></div>
       <div class="cart__total"><span>Total</span><strong id="cartTotal">$0</strong></div>
       <button class="btn btn--primary btn--block" id="checkout">Finalizar compra por WhatsApp</button>
       <p class="cart__hint" id="cartHint"></p>
@@ -276,6 +286,7 @@
         <label>Contraseña<input type="password" name="password" autocomplete="current-password" required /></label>
         <p class="form-error" role="alert"></p>
         <button class="btn btn--primary btn--block" type="submit">Ingresar</button>
+        <p class="form-alt"><button type="button" class="link" id="forgotPassword">¿Olvidaste tu contraseña?</button></p>
         <p class="form-alt">¿No tenés cuenta? <button type="button" class="link" data-auth-tab="register">Registrate gratis</button></p>
       </form>
 

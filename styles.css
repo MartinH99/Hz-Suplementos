@@ -13,6 +13,7 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
 html { scroll-behavior: smooth; scroll-padding-top: 80px; }
 body { background: var(--bg); color: var(--text); font-family: var(--body); line-height: 1.6; overflow-x: hidden; }
 a { color: inherit; text-decoration: none; }
@@ -396,6 +397,27 @@ h2 { font-size: clamp(2.4rem, 6vw, 4rem); }
   .stats { grid-template-columns: 1fr 1fr; }
   .form-grid { grid-template-columns: 1fr; }
 }
+
+/* ===== Cupones en el carrito ===== */
+.coupon { display: flex; gap: 8px; margin-bottom: 12px; }
+.coupon[hidden], .coupon-applied[hidden], .cart__line[hidden] { display: none; }
+.coupon input { flex: 1; min-width: 0; padding: 10px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 999px; color: var(--text); font: inherit; font-size: .85rem; text-transform: uppercase; outline: none; }
+.coupon input::placeholder { text-transform: none; }
+.coupon input:focus { border-color: var(--accent); }
+.coupon-applied { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 12px; border: 1px dashed var(--accent); border-radius: 12px; background: rgba(198,255,0,.07); font-size: .88rem; }
+.coupon-applied small { color: var(--muted); }
+.cart__line { display: flex; justify-content: space-between; font-size: .9rem; color: var(--muted); margin-bottom: 6px; }
+.cart__line--discount { color: var(--accent); font-weight: 700; }
+.order__items li.order__discount span { color: var(--accent) !important; font-weight: 600; }
+
+.form-grid--3 { grid-template-columns: repeat(3, 1fr); }
+.coupon-code { font-family: ui-monospace, monospace; letter-spacing: .05em; color: var(--accent); }
+@media (max-width: 860px) { .form-grid--3 { grid-template-columns: 1fr; } }
+
+/* Página restablecer contraseña */
+.reset { display: grid; place-items: center; }
+.reset__box { transform: none; width: min(460px, 100%); }
+.reset .account__loading { padding: 30px 0; }
 
 /* ===== Panel admin ===== */
 .muted { color: var(--muted); }

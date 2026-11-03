@@ -120,6 +120,12 @@ async function submitAuth(form, action) {
     closeAuth();
     renderAccountButton();
     renderProducts(activeFilter);
+    renderCart();
+    // Si había escrito un cupón antes de ingresar, lo aplicamos
+    if ($("#couponInput")?.value.trim()) {
+      toggleCart(true);
+      applyCoupon();
+    }
     toast(action === "register" ? `🎉 ¡Bienvenido/a al Team HZ, ${user.name.split(" ")[0]}!` : `👋 ¡Hola de nuevo, ${user.name.split(" ")[0]}!`);
   } catch (err) {
     errorEl.textContent = err.message;
@@ -199,9 +205,11 @@ function renderCart() {
   if (!$("#cartItems")) return;
   const ids = Object.keys(cart).filter((id) => findItem(id));
   const count = ids.reduce((s, id) => s + cart[id], 0);
-  const total = ids.reduce((s, id) => s + findItem(id).price * cart[id], 0);
+  const subtotal = ids.reduce((s, id) => s + findItem(id).price * cart[id], 0);
+  const discount = couponDiscount(subtotal);
   $("#cartCount").textContent = count;
-  $("#cartTotal").textContent = money(total);
+  $("#cartTotal").textContent = money(subtotal - discount);
+  renderCoupon(subtotal, discount);
   $("#cartItems").innerHTML = ids.length
     ? ids.map((id) => {
         const item = findItem(id);
@@ -238,6 +246,62 @@ const toggleCart = (open) => {
   $("#overlay")?.classList.toggle("open", open);
 };
 
+// ===== Cupones (requieren cuenta; el servidor recalcula el descuento al crear el pedido) =====
+let appliedCoupon = null;
+try { appliedCoupon = JSON.parse(localStorage.getItem("hz-coupon")); } catch {}
+
+function setCoupon(coupon) {
+  appliedCoupon = coupon;
+  try { coupon ? localStorage.setItem("hz-coupon", JSON.stringify(coupon)) : localStorage.removeItem("hz-coupon"); } catch {}
+  renderCart();
+}
+
+function couponDiscount(subtotal) {
+  const c = appliedCoupon;
+  if (!c || !currentUser || subtotal < c.minTotal) return 0;
+  return c.type === "percent" ? Math.round((subtotal * c.value) / 100) : Math.min(c.value, subtotal);
+}
+
+function renderCoupon(subtotal, discount) {
+  const active = !!(appliedCoupon && currentUser);
+  $("#couponForm").hidden = active;
+  $("#couponApplied").hidden = !active;
+  $("#subtotalLine").hidden = !discount;
+  $("#discountLine").hidden = !discount;
+  $("#cartSubtotal").textContent = money(subtotal);
+  $("#cartDiscount").textContent = "-" + money(discount);
+  if (active) {
+    const c = appliedCoupon;
+    $("#couponCode").textContent = c.code;
+    $("#couponDesc").textContent = subtotal && subtotal < c.minTotal
+      ? `(mínimo ${money(c.minTotal)})`
+      : c.type === "percent" ? `${c.value}% OFF` : `${money(c.value)} OFF`;
+  }
+}
+
+async function applyCoupon() {
+  const code = $("#couponInput").value.trim();
+  if (!code) return;
+  if (!currentUser) {
+    toggleCart(false);
+    return openAuth("login", "Ingresá o creá tu cuenta para usar tu cupón 🎟️");
+  }
+  const items = Object.keys(cart).filter((id) => findItem(id)).map((id) => ({ id, qty: cart[id] }));
+  if (!items.length) return toast("Agregá productos antes de aplicar el cupón");
+  const btn = $("#couponForm button");
+  btn.disabled = true;
+  try {
+    const { coupon, discount } = await api("coupons", { method: "POST", body: { code, items } });
+    $("#couponInput").value = "";
+    setCoupon(coupon);
+    toast(`🎟️ Cupón ${coupon.code} aplicado: ahorrás ${money(discount)}`);
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // Finalizar compra: si hay sesión, guarda el pedido en la base y lo envía por WhatsApp
 function buildOrderMessage({ lines, total, order, notes }) {
   const msg = [
@@ -245,8 +309,9 @@ function buildOrderMessage({ lines, total, order, notes }) {
     "",
     ...lines.map((l) => `• ${l.qty} x ${l.name} — ${money(l.price * l.qty)}`),
     "",
-    `*Total: ${money(total)}*`,
   ];
+  if (order?.discount) msg.push(`Subtotal: ${money(order.subtotal)}`, `🎟️ Cupón ${order.couponCode}: -${money(order.discount)}`);
+  msg.push(`*Total: ${money(total)}*`);
   if (order) {
     msg.push("", `👤 ${order.shipName}`);
     if (order.shipPhone) msg.push(`📞 ${order.shipPhone}`);
@@ -272,7 +337,10 @@ async function checkout() {
   if (currentUser) {
     btn.disabled = true;
     try {
-      ({ order } = await api("orders", { method: "POST", body: { items: ids.map((id) => ({ id, qty: cart[id] })), notes } }));
+      ({ order } = await api("orders", {
+        method: "POST",
+        body: { items: ids.map((id) => ({ id, qty: cart[id] })), notes, coupon: appliedCoupon?.code },
+      }));
       lines = order.items;
       total = order.total;
     } catch (err) {
@@ -294,7 +362,7 @@ async function checkout() {
   if (order) {
     cart = {};
     saveCart();
-    renderCart();
+    setCoupon(null);
     if ($("#orderNotes")) $("#orderNotes").value = "";
     toggleCart(false);
     toast(`📲 Pedido #HZ-${String(order.id).padStart(5, "0")} guardado. ¡Terminá de enviarlo por WhatsApp!`);
@@ -349,6 +417,15 @@ function initLanding() {
     if (e.key === "Escape") { toggleCart(false); closeAuth(); }
   });
   $("#checkout").addEventListener("click", checkout);
+  $("#couponForm").addEventListener("submit", (e) => { e.preventDefault(); applyCoupon(); });
+  $("#couponRemove").addEventListener("click", () => setCoupon(null));
+
+  // Recuperar contraseña: el cliente pide el link por WhatsApp y el admin se lo envía desde el panel
+  $("#forgotPassword").addEventListener("click", () => {
+    const email = $("#loginForm").elements.email.value.trim();
+    const text = `¡Hola HZ Suplementos! Me olvidé la contraseña de mi cuenta${email ? ` (${email})` : ""}. ¿Me pueden enviar un link para crear una nueva?`;
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+  });
 
   // Menú móvil
   const burger = $("#burger");
