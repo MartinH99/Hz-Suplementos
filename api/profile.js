@@ -1,6 +1,7 @@
 import { getDb } from "../lib/db.js";
 import { json, readJson, handle, str, HttpError } from "../lib/http.js";
 import { requireUser, verifyPassword, destroySession, publicUser, USER_FIELDS } from "../lib/auth.js";
+import { hit, assertNotBlocked } from "../lib/ratelimit.js";
 
 const GOALS = new Set(["", "volumen", "definicion", "rendimiento", "salud"]);
 
@@ -42,8 +43,11 @@ export const DELETE = handle(async (request) => {
   const user = await requireUser(request);
   const body = await readJson(request);
   const db = await getDb();
+  const failKey = `password-fail:user:${user.id}`;
+  await assertNotBlocked(db, failKey, 5);
   const { rows } = await db.execute({ sql: "SELECT password_hash FROM users WHERE id = ?", args: [user.id] });
   if (!(await verifyPassword(String(body.password || ""), rows[0].password_hash))) {
+    await hit(db, failKey, 15 * 60);
     throw new HttpError(400, "La contraseña no es correcta");
   }
   const cookie = await destroySession(request);

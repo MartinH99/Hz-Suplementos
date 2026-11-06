@@ -4,8 +4,15 @@ import {
   hashPassword, verifyPassword, createSession, destroySession, revokeOtherSessions,
   getUser, requireUser, publicUser, findResetUser, USER_FIELDS,
 } from "../lib/auth.js";
+import { clientIp, limit, hit, assertNotBlocked, clear } from "../lib/ratelimit.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN = 60;
+
+// Hash de relleno: si el email no existe igual calculamos un hash, para que el tiempo
+// de respuesta no revele qué emails están registrados.
+let dummyHash;
+const getDummyHash = async () => (dummyHash ||= await hashPassword("hz-dummy-password"));
 
 function checkPassword(password) {
   if (typeof password !== "string" || password.length < 8) throw new HttpError(400, "La contraseña debe tener al menos 8 caracteres");
@@ -27,6 +34,7 @@ export const POST = handle(async (request) => {
       if (!EMAIL_RE.test(email)) throw new HttpError(400, "Ingresá un email válido");
       if (!name) throw new HttpError(400, "Ingresá tu nombre");
       checkPassword(body.password);
+      await limit(db, `register:ip:${clientIp(request)}`, 5, 60 * MIN, "Se crearon demasiadas cuentas desde esta conexión");
 
       const exists = await db.execute({ sql: "SELECT 1 FROM users WHERE email = ?", args: [email] });
       if (exists.rows.length) throw new HttpError(409, "Ya existe una cuenta con ese email");
@@ -41,9 +49,20 @@ export const POST = handle(async (request) => {
 
     case "login": {
       const email = str(body.email, 120).toLowerCase();
+      // Bloqueo temporal tras varios intentos fallidos: 5 por cuenta y 20 por conexión cada 15 min
+      const emailKey = `login-fail:email:${email}`;
+      const ipKey = `login-fail:ip:${clientIp(request)}`;
+      await assertNotBlocked(db, emailKey, 5);
+      await assertNotBlocked(db, ipKey, 20);
+
       const { rows } = await db.execute({ sql: `SELECT password_hash, ${USER_FIELDS} FROM users WHERE email = ?`, args: [email] });
-      const ok = rows[0] && typeof body.password === "string" && (await verifyPassword(body.password, rows[0].password_hash));
-      if (!ok) throw new HttpError(401, "Email o contraseña incorrectos");
+      const password = typeof body.password === "string" ? body.password : "";
+      const ok = await verifyPassword(password, rows[0]?.password_hash || (await getDummyHash()));
+      if (!rows[0] || !ok) {
+        await Promise.all([hit(db, emailKey, 15 * MIN), hit(db, ipKey, 15 * MIN)]);
+        throw new HttpError(401, "Email o contraseña incorrectos");
+      }
+      await clear(db, emailKey);
       const user = publicUser(rows[0]);
       return json({ user }, 200, { "set-cookie": await createSession(user.id) });
     }
@@ -53,10 +72,14 @@ export const POST = handle(async (request) => {
 
     case "password": {
       const user = await requireUser(request);
+      const failKey = `password-fail:user:${user.id}`;
+      await assertNotBlocked(db, failKey, 5);
       const { rows } = await db.execute({ sql: "SELECT password_hash FROM users WHERE id = ?", args: [user.id] });
       if (!(await verifyPassword(String(body.current || ""), rows[0].password_hash))) {
+        await hit(db, failKey, 15 * MIN);
         throw new HttpError(400, "La contraseña actual no es correcta");
       }
+      await clear(db, failKey);
       checkPassword(body.password);
       await db.execute({ sql: "UPDATE users SET password_hash = ? WHERE id = ?", args: [await hashPassword(body.password), user.id] });
       await revokeOtherSessions(request, user.id);
@@ -65,11 +88,13 @@ export const POST = handle(async (request) => {
 
     // Recuperación con link de un solo uso (lo genera el admin y lo envía por WhatsApp)
     case "reset-check": {
+      await limit(db, `reset:ip:${clientIp(request)}`, 20, 15 * MIN);
       const target = await findResetUser(body.token);
       return json({ name: target.name.split(" ")[0], email: target.email });
     }
 
     case "reset": {
+      await limit(db, `reset:ip:${clientIp(request)}`, 20, 15 * MIN);
       const target = await findResetUser(body.token);
       checkPassword(body.password);
       await db.batch([

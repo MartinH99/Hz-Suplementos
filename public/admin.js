@@ -14,7 +14,7 @@ const toDate = (s) => new Date(s.replace(" ", "T") + "Z");
 const shortDate = (s) => (s ? toDate(s).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—");
 const dateTime = (s) => toDate(s).toLocaleString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 
-// Teléfono argentino a formato internacional para wa.me
+// Teléfono argentino a formato internacional para WhatsApp
 function waPhone(phone) {
   let d = String(phone || "").replace(/\D/g, "");
   if (!d) return "";
@@ -141,7 +141,7 @@ function notifyCustomer(id) {
   const status = pickupReady ? "¡Tu pedido ya está listo para retirar! 🏪" : STATUS_MSG[o.status];
   const toPay = ["pendiente", "confirmado", "enviado"].includes(o.status) ? `\n\nTotal a pagar en efectivo: ${money(o.total)}` : "";
   const text = `¡Hola ${o.shipName.split(" ")[0]}! Te escribimos de HZ Suplementos por tu pedido ${code(o.id)}.\n\n${status}${toPay}`;
-  window.open(`https://wa.me/${waPhone(o.shipPhone)}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+  window.open(waLink(waPhone(o.shipPhone), text), "_blank", "noopener");
 }
 
 // ===== Clientes =====
@@ -187,7 +187,7 @@ async function sendResetLink(btn) {
     const { url, name, phone } = await api("admin", { method: "POST", body: { action: "reset-link", id: Number(btn.dataset.resetFor) } });
     const text = `¡Hola ${name.split(" ")[0]}! Te escribimos de HZ Suplementos 💪\n\nEntrá a este link para crear tu nueva contraseña (vale por 24 horas y se usa una sola vez):\n${url}`;
     if (waPhone(phone)) {
-      window.open(`https://wa.me/${waPhone(phone)}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+      window.open(waLink(waPhone(phone), text), "_blank", "noopener");
       toast("Link generado: se abrió WhatsApp para enviarlo");
     } else {
       await navigator.clipboard.writeText(url).then(

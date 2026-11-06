@@ -6,6 +6,9 @@ import { validateCoupon, couponUsageDelta } from "../lib/coupons.js";
 import { getDelivery, quoteDelivery } from "../lib/settings.js";
 import { orderFields } from "../lib/orders.js";
 import { expand, getInventory, checkStock, deductStatements, restockStatements, isStockConflict } from "../lib/stock.js";
+import { limit } from "../lib/ratelimit.js";
+
+const MAX_PENDING = 3;
 
 // GET /api/orders → historial de pedidos con sus productos
 export const GET = handle(async (request) => {
@@ -39,6 +42,17 @@ export const POST = handle(async (request) => {
   const { lines, subtotal } = await buildLines(body.items);
 
   const db = await getDb();
+
+  // Anti-abuso: nadie puede "reservar" stock acumulando pedidos sin confirmar
+  const { rows: [open] } = await db.execute({
+    sql: "SELECT COUNT(*) AS n FROM orders WHERE user_id = ? AND status = 'pendiente'",
+    args: [user.id],
+  });
+  if (Number(open.n) >= MAX_PENDING) {
+    throw new HttpError(429, `Tenés ${MAX_PENDING} pedidos pendientes. Esperá a que te los confirmemos por WhatsApp o cancelá alguno desde Mi cuenta.`);
+  }
+  await limit(db, `orders:user:${user.id}`, 10, 60 * 60, "Hiciste demasiados pedidos seguidos");
+
   let coupon = null;
   let discount = 0;
   if (body.coupon) ({ coupon, discount } = await validateCoupon(db, user.id, body.coupon, subtotal));

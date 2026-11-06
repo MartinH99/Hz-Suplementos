@@ -1,5 +1,6 @@
-// Servidor local: sirve los archivos estáticos y ejecuta las funciones de /api
-// igual que Vercel (handlers GET/POST/... que reciben un Request y devuelven un Response).
+// Servidor local: sirve public/ y ejecuta las funciones de /api igual que Vercel
+// (handlers GET/POST/... que reciben un Request y devuelven un Response),
+// con las mismas cabeceras de seguridad de vercel.json.
 // Uso: npm run dev   (lee .env.local; sin Turso usa una base local en archivo)
 import http from "node:http";
 import { readFile } from "node:fs/promises";
@@ -9,6 +10,12 @@ import { pathToFileURL } from "node:url";
 process.env.TURSO_DATABASE_URL ||= "file:local.db";
 const PORT = Number(process.env.PORT) || 5173;
 const ROOT = process.cwd();
+const config = JSON.parse(await readFile(join(ROOT, "vercel.json"), "utf8"));
+const PUBLIC = join(ROOT, config.outputDirectory || ".");
+// En local no hay HTTPS: sacamos upgrade-insecure-requests para no romper las llamadas
+const SECURITY_HEADERS = Object.fromEntries(
+  config.headers.flatMap((h) => h.headers).map(({ key, value }) => [key, value.replace(/;\s*upgrade-insecure-requests/, "")])
+);
 const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".json": "application/json", ".svg": "image/svg+xml" };
 
 http.createServer(async (req, res) => {
@@ -27,15 +34,15 @@ http.createServer(async (req, res) => {
         body: ["GET", "HEAD"].includes(req.method) ? undefined : Buffer.concat(chunks),
       });
       const response = await handler(request);
-      res.writeHead(response.status, Object.fromEntries(response.headers));
+      res.writeHead(response.status, { ...SECURITY_HEADERS, ...Object.fromEntries(response.headers) });
       return res.end(Buffer.from(await response.arrayBuffer()));
     }
     let path = normalize(decodeURIComponent(url.pathname)).replace(/^([/\\])+/, "");
     if (path.startsWith("..")) throw Object.assign(new Error(), { code: "ENOENT" });
     if (!path || path.endsWith("/") || path.endsWith("\\")) path += "index.html";
     if (!extname(path)) path += ".html";
-    const file = await readFile(join(ROOT, path));
-    res.writeHead(200, { "content-type": TYPES[extname(path)] || "application/octet-stream", "cache-control": "no-cache" });
+    const file = await readFile(join(PUBLIC, path));
+    res.writeHead(200, { ...SECURITY_HEADERS, "content-type": TYPES[extname(path)] || "application/octet-stream", "cache-control": "no-cache" });
     res.end(file);
   } catch (err) {
     if (err.code !== "ENOENT" && err.code !== "ERR_MODULE_NOT_FOUND") console.error(err);

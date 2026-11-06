@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nueva contraseña | HZ Suplementos</title>
+  <meta name="robots" content="noindex" />
+  <meta name="referrer" content="no-referrer" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header scrolled">
+    <div class="container header__inner">
+      <a href="/" class="logo">HZ<span>SUPLEMENTOS</span></a>
+    </div>
+  </header>
+
+  <main class="account container reset">
+    <div class="modal__box reset__box">
+      <h1 class="modal__title">NUEVA <span class="accent">CONTRASEÑA</span></h1>
+      <p class="account__loading" id="resetStatus">Verificando el link...</p>
+
+      <form class="form" id="resetForm" hidden>
+        <p class="muted" id="resetHello"></p>
+        <label>Nueva contraseña <small>(mínimo 8 caracteres)</small><input name="password" type="password" autocomplete="new-password" minlength="8" required /></label>
+        <label>Repetila<input name="confirm" type="password" autocomplete="new-password" minlength="8" required /></label>
+        <p class="form-error" role="alert"></p>
+        <button class="btn btn--primary btn--block" type="submit">Guardar y entrar</button>
+      </form>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="script.js"></script>
+  <script src="restablecer.js"></script>
+</body>
+</html>

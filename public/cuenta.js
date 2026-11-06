@@ -138,7 +138,7 @@ function bindEvents() {
     const ask = e.target.closest("[data-ask]");
     if (ask) {
       const text = `¡Hola HZ Suplementos! Quería consultar por mi pedido ${orderCode(ask.dataset.ask)}.`;
-      window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+      window.open(waLink(WHATSAPP_NUMBER, text), "_blank", "noopener");
     }
 
     const cancel = e.target.closest("[data-cancel]");

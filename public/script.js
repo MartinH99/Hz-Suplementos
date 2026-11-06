@@ -3,6 +3,8 @@ const money = (n) => "$" + n.toLocaleString("es-AR");
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const WHATSAPP_NUMBER = "5492236945946";
+// Link directo a WhatsApp (api.whatsapp.com conserva los emojis; la redirección de wa.me los rompe)
+const waLink = (phone, text) => `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(text)}`;
 const CAT_LABEL = { proteinas: "Proteínas", aminoacidos: "Aminoácidos", creatina: "Creatina", preentreno: "Pre-entreno", vitaminas: "Vitaminas" };
 
 async function api(path, { method = "GET", body } = {}) {
@@ -20,9 +22,8 @@ async function api(path, { method = "GET", body } = {}) {
 let PRODUCTS = [];
 let COMBOS = {};
 async function loadCatalog() {
-  // Precios y productos activos vienen de la base (editables en el panel admin);
-  // si la API no responde, usamos el catálogo base del repo.
-  const data = await api("catalog").catch(() => fetch("/data/catalog.json").then((r) => r.json()));
+  // Precios, stock y productos activos vienen de la base (editables en el panel admin)
+  const data = await api("catalog");
   PRODUCTS = data.products;
   COMBOS = Object.fromEntries(data.combos.map((c) => [c.id, c]));
   DELIVERY = data.delivery || DELIVERY;
@@ -514,7 +515,7 @@ async function onCheckoutClick() {
     }
   }
 
-  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(buildOrderMessage(summary))}`;
+  const url = waLink(WHATSAPP_NUMBER, buildOrderMessage(summary));
   if (win) {
     win.opener = null;
     win.location.href = url;
@@ -595,7 +596,7 @@ function initLanding() {
   $("#forgotPassword").addEventListener("click", () => {
     const email = $("#loginForm").elements.email.value.trim();
     const text = `¡Hola HZ Suplementos! Me olvidé la contraseña de mi cuenta${email ? ` (${email})` : ""}. ¿Me pueden enviar un link para crear una nueva?`;
-    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+    window.open(waLink(WHATSAPP_NUMBER, text), "_blank", "noopener");
   });
 
   // Menú móvil
